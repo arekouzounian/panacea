@@ -1,0 +1,3 @@
+message ExampleRequest {
+    string id = 1; 
+}
