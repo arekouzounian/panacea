@@ -9,7 +9,7 @@ package main
 import (
 	"context"
 	"fmt"
-	mrand "math/rand"
+	"os"
 
 	"github.com/ipfs/go-log"
 	"github.com/libp2p/go-libp2p"
@@ -19,6 +19,38 @@ import (
 )
 
 var logger = log.Logger("bootstrap")
+
+const keyFilePath = "bootstrap.key"
+
+func loadOrGenKey() (crypto.PrivKey, error) {
+	// key exists, read and return
+	if _, err := os.Stat(keyFilePath); err == nil {
+		bytes, err := os.ReadFile(keyFilePath)
+		if err != nil {
+			return nil, err
+		}
+
+		return crypto.UnmarshalPrivateKey(bytes)
+	}
+
+	// gen new key
+	prvKey, _, err := crypto.GenerateKeyPair(crypto.RSA, 2048)
+	if err != nil {
+		return nil, err
+	}
+
+	// marshal it for later
+	data, err := crypto.MarshalPrivateKey(prvKey)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := os.WriteFile(keyFilePath, data, 0600); err != nil {
+		return nil, err
+	}
+
+	return prvKey, nil
+}
 
 func main() {
 	log.SetAllLoggers(log.LevelInfo)
@@ -31,10 +63,8 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	r := mrand.New(mrand.NewSource(int64(port)))
-
 	// in the future, have a static keypair that we read from
-	prvKey, _, err := crypto.GenerateKeyPairWithReader(crypto.RSA, 2048, r)
+	prvKey, err := loadOrGenKey()
 	if err != nil {
 		panic(err)
 	}
