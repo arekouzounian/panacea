@@ -47,6 +47,8 @@
     - each modification is signed with their private key, and thus verification means checking merkle tree consistency + verifying the block signature 
 - nodes can request the distributed identities of other nodes (majority vote on responses)
 - nodes can also request the location of a peer from its distributed identity; then they can communicate with each other directly to share records (respecting ACLs)
+- use pubsub for broadcasting messages: 
+    - [pubsub example](https://github.com/libp2p/go-libp2p/tree/8d6ceabd74ac8faf80653f474f13d45c0cbe5658/examples/pubsub/basic-chat-with-rendezvous)
 
 
 
