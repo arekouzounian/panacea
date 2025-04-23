@@ -1,0 +1,79 @@
+syntax = "proto3"; 
+
+option go_package = "./chain";
+
+
+/*
+- A user can add/delete records. 
+	- A record being modified is the same as deleting it then adding a new one	
+	- The hash of each record is what's actually stored on the chain
+	- each of these requests must have a signed hash using the user's public key
+- when an entity requests a record from another one, they publish a request message
+	- recipient publishes a response message (affirmative or negative)
+- A request can also be published that asks for all blocks after a certain hash. 
+	- longest one is used (?)
+*/
+
+message Block {
+	string PreviousBlockHash = 1; 
+	string Hash = 2; 
+}
+
+// INVEST, NOW!
+message BlockChain {
+	string MerkleRoot = 1; 
+	repeated Block Blocks = 2; 
+}
+
+message Request {
+	// All blocks after this hash. 
+	// Should not be empty; should always at least have the root hash.
+	message ChainHistory {
+		string AfterHash = 1; 
+	}
+
+	message ExampleRequest {
+		string Content = 1;
+	}
+
+
+	int64 Timestamp = 1;
+	string PeerID = 2; 
+
+	oneof RequestType {
+		ChainHistory History_Request = 3;
+		ExampleRequest Example_Request = 4;
+	}
+}
+
+
+message PeerRecordUpdate {
+	repeated string AddedRecordHashes = 1; 
+	repeated string RemovedRecordHashes = 2;
+
+	// add block hash in here? 
+}
+
+// To request records from a peer we need to generate 
+// A request ID and provide a list of hashes
+// that we want excluded. 
+// That way if we want all records the list can be left blank. 
+message PeerRecordRequest {
+	string RecipientPeerID = 1;
+	int64 RequestID = 2;  
+
+	// leave empty for all records?
+	repeated string ExcludedRecordsList = 3;
+}
+
+
+// A peer will respond to the request ID with its own response block
+// States whether or not they accept this request
+// Off-chain, information is then exchanged
+message PeerRecordRequestResponse {
+	string RequesterPeerID = 1; 
+	int64 RequestID = 2;
+
+	bool RequestAccepted = 3; 
+}
+

@@ -17,10 +17,12 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/libp2p/go-libp2p/core/routing"
-
 	drouting "github.com/libp2p/go-libp2p/p2p/discovery/routing"
 	dutil "github.com/libp2p/go-libp2p/p2p/discovery/util"
 	"github.com/multiformats/go-multiaddr"
+	"google.golang.org/protobuf/proto"
+
+	"github.com/arekouzounian/panacea/chain"
 )
 
 const (
@@ -37,13 +39,12 @@ func StartPeer() {
 	if err != nil {
 		panic(err)
 	}
-	var bootstrapPeerList = []multiaddr.Multiaddr{bootstrapPeer}
+	bootstrapPeerList := []multiaddr.Multiaddr{bootstrapPeer}
 
 	var idht *dht.IpfsDHT
 
 	opts := []libp2p.Option{
 		libp2p.Routing(func(h host.Host) (routing.PeerRouting, error) {
-
 			// Initialize the DHT for peer discovery/routing.
 			// Also begin the bootstrap process.
 			var err error
@@ -119,44 +120,104 @@ func StartPeer() {
 	if err != nil {
 		panic(err)
 	}
+	defer topic.Close()
 
-	go func(ctx context.Context, topic *pubsub.Topic) {
-		reader := bufio.NewReader(os.Stdin)
-		for {
-			fmt.Printf("> ")
-			s, err := reader.ReadString('\n')
-			if err != nil {
-				panic(err)
-			}
-			if err := topic.Publish(ctx, []byte(s)); err != nil {
-				fmt.Println("### Publish error:", err)
-			}
-		}
-	}(ctx, topic)
+	req_chan := make(chan *chain.Request, 1)
+	defer close(req_chan)
+
+	go write_to_pub(req_chan, ctx, topic)
 
 	sub, err := topic.Subscribe()
 	if err != nil {
 		panic(err)
 	}
+	defer sub.Cancel()
 
-	go func(ctx context.Context, sub *pubsub.Subscription) {
-		for {
-			m, err := sub.Next(ctx)
-			if err != nil {
-				panic(err)
-			}
+	go read_from_sub(ctx, sub, h)
 
-			if m.ReceivedFrom == h.ID() {
-				continue
-			}
-
-			fmt.Printf("%s> %s", m.ReceivedFrom, string(m.Message.Data))
-		}
-	}(ctx, sub)
+	// Enter REPL loop to get user input
 
 	ch := make(chan os.Signal, 1)
 	signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM)
-	<-ch
-	log.Println("Received signal, shutting down...")
 
+	scanner := bufio.NewScanner(os.Stdin)
+outer_loop:
+	for {
+		select {
+		case <-ch:
+			log.Println("Received signal, shutting down...")
+			break outer_loop
+		default:
+			fmt.Print("Enter a message: ")
+			scanner.Scan()
+			msg := scanner.Text()
+
+			if len(msg) < 1 {
+				continue
+			}
+
+			marshal := chain.Request{
+				PeerID:    h.ID().String(),
+				Timestamp: time.Now().Unix(),
+				RequestType: &chain.Request_History_Request{
+					History_Request: &chain.Request_ChainHistory{
+						AfterHash: nil,
+					},
+				},
+			}
+
+			req_chan <- &marshal
+		}
+	}
+}
+
+func write_to_pub(req_chan <-chan *chain.Request, ctx context.Context, pub *pubsub.Topic) {
+	for req := range req_chan {
+
+		encoded, err := proto.Marshal(req)
+		if err != nil {
+			panic(err)
+		}
+
+		if err := pub.Publish(ctx, encoded); err != nil {
+			fmt.Println("### Publish error:", err)
+		}
+	}
+}
+
+func read_from_sub(ctx context.Context, sub *pubsub.Subscription, host host.Host) {
+outer_sub_loop:
+	for {
+		select {
+		case <-ctx.Done():
+			break outer_sub_loop
+		default:
+			m, err := sub.Next(ctx)
+			if err != nil {
+				break outer_sub_loop
+			}
+			if m == nil {
+				continue
+			}
+
+			if m.ReceivedFrom == host.ID() {
+				continue
+			}
+
+			var msg chain.Request
+			err = proto.Unmarshal(m.Data, &msg)
+			if err != nil {
+				fmt.Println("Receiving error:", err.Error())
+				continue
+			}
+
+			switch v := msg.RequestType.(type) {
+			case *chain.Request_Example_Request:
+				fmt.Printf("Example|%s> %s\n", msg.PeerID[len(msg.PeerID)-16:], v.Example_Request.GetContent())
+			default:
+				fmt.Printf("Received unimplemented request type: %v", v)
+			}
+		}
+
+	}
 }
