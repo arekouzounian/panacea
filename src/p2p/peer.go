@@ -3,6 +3,7 @@ package p2p
 import (
 	"bufio"
 	"context"
+	"crypto/rand"
 	"fmt"
 	"log"
 	"os"
@@ -13,6 +14,7 @@ import (
 	"github.com/libp2p/go-libp2p"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
+	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
@@ -23,6 +25,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/arekouzounian/panacea/chain"
+	"github.com/arekouzounian/panacea/ledger"
 )
 
 const (
@@ -41,6 +44,8 @@ func StartPeer() {
 	}
 	bootstrapPeerList := []multiaddr.Multiaddr{bootstrapPeer}
 
+	sk, _, err := crypto.GenerateEd25519Key(rand.Reader)
+
 	var idht *dht.IpfsDHT
 
 	opts := []libp2p.Option{
@@ -56,6 +61,7 @@ func StartPeer() {
 			err = idht.Bootstrap(ctx)
 			return idht, err
 		}),
+		libp2p.Identity(sk),
 		libp2p.NoSecurity, // TODO: support TLS/Noise
 	}
 
@@ -105,12 +111,20 @@ func StartPeer() {
 		}
 	}
 
+	marshalPeerID, err := h.ID().MarshalBinary()
+	if err != nil {
+		panic(err)
+	}
+
 	// pubsub
 	psOpts := []pubsub.Option{
 		pubsub.WithFloodPublish(true),
 		pubsub.WithPeerExchange(true),
 		pubsub.WithMessageIdFn(pubsub.DefaultMsgIdFn),
 	}
+
+	state := ledger.NewInMemoryStateHandler()
+	bc, err := chain.NewLinkedListBC(state)
 
 	ps, err := pubsub.NewGossipSub(ctx, h, psOpts...)
 	if err != nil {
@@ -156,17 +170,47 @@ outer_loop:
 				continue
 			}
 
-			marshal := chain.Request{
-				PeerID:    h.ID().String(),
-				Timestamp: time.Now().Unix(),
-				RequestType: &chain.Request_History_Request{
-					History_Request: &chain.Request_ChainHistory{
-						AfterHash: nil,
-					},
-				},
-			}
+			switch msg {
+			// case "1":
+			// 	fmt.Println("Sending history request")
+			// 	marshal := chain.Request{
+			// 		PeerID:    h.ID().String(),
+			// 		Timestamp: time.Now().Unix(),
+			// 		RequestType: &chain.Request_History_Request{
+			// 			History_Request: &chain.Request_ChainHistory{
+			// 				AfterHash: chain.CHAIN_ROOT,
+			// 			},
+			// 		},
+			// 	}
 
-			req_chan <- &marshal
+			// 	req_chan <- &marshal
+			default:
+				inner_record := chain.EmptyRecord{
+					Msg: msg,
+				}
+
+				outer_record := chain.BlockRecord{
+					Timestamp:       time.Now().Unix(),
+					InitiatorPeerID: marshalPeerID,
+					InnerRecord: &chain.BlockRecord_TestRecord{
+						TestRecord: &inner_record,
+					},
+				}
+
+				block, err := SignRecordToBlock(sk, &outer_record)
+				if err != nil {
+					fmt.Printf("Error signing record: %s\n", err)
+					continue
+				}
+
+				err = bc.AddBlock(block)
+				if err != nil {
+					fmt.Printf("Unable to extend blockchain: %s", err)
+				}
+
+				fmt.Println()
+				bc.PrintChain()
+			}
 		}
 	}
 }

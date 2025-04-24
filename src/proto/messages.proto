@@ -14,15 +14,26 @@ option go_package = "./chain";
 	- longest one is used (?)
 */
 
-message Block {
-	string PreviousBlockHash = 1; 
-	string Hash = 2; 
+// INVEST, NOW!
+// message BlockChain {
+// 	string MerkleRoot = 1; 
+// 	repeated Block Blocks = 2; 
+// }
+
+message BlockRecord {
+	int64 Timestamp = 1; 
+	bytes InitiatorPeerID = 2; 
+	optional bytes PreviousBlockHash = 3; 
+	oneof InnerRecord {
+		PeerRecordUpdate UpdateRecords = 4; 
+		AuthorizedPeerUpdate UpdatePeers = 5;
+		EmptyRecord TestRecord = 6;
+	} 
 }
 
-// INVEST, NOW!
-message BlockChain {
-	string MerkleRoot = 1; 
-	repeated Block Blocks = 2; 
+message Block {
+	BlockRecord Record = 1; 
+	bytes Signature = 2; 
 }
 
 message Request {
@@ -46,12 +57,19 @@ message Request {
 	}
 }
 
+message EmptyRecord {
+	string Msg = 1; 
+}
 
 message PeerRecordUpdate {
 	repeated string AddedRecordHashes = 1; 
 	repeated string RemovedRecordHashes = 2;
-
 	// add block hash in here? 
+}
+
+message AuthorizedPeerUpdate {
+	repeated string AddedPeerIDs = 1; 
+	repeated string RemovedPeerIDs = 2; 
 }
 
 // To request records from a peer we need to generate 
