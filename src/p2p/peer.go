@@ -34,10 +34,12 @@ const (
 )
 
 type WebInfoHolder struct {
-	Identity string
+	Identity        string
+	AuthorizedPeers []string
+	FileHashes      []string
 }
 
-func StartPeer() {
+func StartPeer(webServerPort string) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -49,6 +51,9 @@ func StartPeer() {
 	bootstrapPeerList := []multiaddr.Multiaddr{bootstrapPeer}
 
 	sk, _, err := crypto.GenerateEd25519Key(rand.Reader)
+	if err != nil {
+		panic(err)
+	}
 
 	var idht *dht.IpfsDHT
 
@@ -73,6 +78,9 @@ func StartPeer() {
 	if err != nil {
 		panic(err)
 	}
+
+	srv := start_web_server(h, ctx, webServerPort)
+	defer srv.Shutdown(ctx)
 
 	// connect to the bootstrap node(s)
 	for _, addr := range bootstrapPeerList {
@@ -156,92 +164,11 @@ func StartPeer() {
 	ch := make(chan os.Signal, 1)
 	signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM)
 
-	// Web Interface testing -- move later
-	info := WebInfoHolder{
-		Identity: h.ID().String(),
-	}
-
-	mainHandler := func(w http.ResponseWriter, r *http.Request) {
-		t, err := template.ParseFiles("p2p/index.html")
-		if err != nil {
-			http.Error(w, err.Error(), 500)
-			return
-		}
-
-		t.Execute(w, info)
-	}
-	srv := &http.Server{
-		Addr: ":8082",
-	}
-	defer srv.Shutdown(ctx)
-	http.HandleFunc("/", mainHandler)
-	go func() {
-		srv.ListenAndServe()
-	}()
-	// End Web Interface
+	// start_web_server(h, ctx, webServerPort)
 
 	<-ch
 	log.Println("Received shutdown signal, attempting graceful shutdown...")
 
-	// outer_loop:
-
-	// 	for {
-	// 		select {
-	// 		case <-ch:
-	// 			log.Println("Received signal, shutting down...")
-	// 			break outer_loop
-	// 		default:
-	// 			fmt.Print("Enter a message: ")
-	// 			scanner.Scan()
-	// 			msg := scanner.Text()
-
-	// 			if len(msg) < 1 {
-	// 				continue
-	// 			}
-
-	// 			switch msg {
-	// case "1":
-	// 	fmt.Println("Sending history request")
-	// 	marshal := chain.Request{
-	// 		PeerID:    h.ID().String(),
-	// 		Timestamp: time.Now().Unix(),
-	// 		RequestType: &chain.Request_History_Request{
-	// 			History_Request: &chain.Request_ChainHistory{
-	// 				AfterHash: chain.CHAIN_ROOT,
-	// 			},
-	// 		},
-	// 	}
-
-	// 	req_chan <- &marshal
-	// 	default:
-	// 		inner_record := chain.EmptyRecord{
-	// 			Msg: msg,
-	// 		}
-
-	// 		outer_record := chain.BlockRecord{
-	// 			Timestamp:       time.Now().Unix(),
-	// 			InitiatorPeerID: marshalPeerID,
-	// 			InnerRecord: &chain.BlockRecord_TestRecord{
-	// 				TestRecord: &inner_record,
-	// 			},
-	// 		}
-
-	// 		block, err := SignRecordToBlock(sk, &outer_record)
-	// 		if err != nil {
-	// 			fmt.Printf("Error signing record: %s\n", err)
-	// 			continue
-	// 		}
-
-	// 		err = bc.AddBlock(block)
-	// 		if err != nil {
-	// 			fmt.Printf("Unable to extend blockchain: %s", err)
-	// 		}
-
-	// 		fmt.Println()
-	// 		bc.PrintChain()
-	// 	}
-	// }
-	// }
 }
 
 func write_to_pub(req_chan <-chan *chain.Request, ctx context.Context, pub *pubsub.Topic) {
@@ -293,4 +220,65 @@ outer_sub_loop:
 		}
 
 	}
+}
+
+func start_web_server(h host.Host, ctx context.Context, port string) *http.Server {
+	info := WebInfoHolder{
+		Identity:        h.ID().String(),
+		FileHashes:      []string{},
+		AuthorizedPeers: []string{},
+	}
+
+	mainHandler := func(w http.ResponseWriter, r *http.Request) {
+		t, err := template.ParseFiles("p2p/index.html")
+		if err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
+
+		t.Execute(w, info)
+	}
+	formHandler := func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != "POST" {
+			http.Error(w, "method not allowed", http.StatusForbidden)
+			return
+		}
+
+		// max 10mb mem
+		err := r.ParseMultipartForm(10 << 20)
+		if err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
+
+		name := r.FormValue("name")
+		if name != "" {
+			info.AuthorizedPeers = append(info.AuthorizedPeers, name)
+		}
+
+		_, header, err := r.FormFile("file")
+		if err != nil && err != http.ErrMissingFile {
+			http.Error(w, err.Error(), 500)
+			return
+		}
+
+		if header != nil {
+			info.FileHashes = append(info.FileHashes, header.Filename)
+		}
+	}
+
+	srv := &http.Server{
+		Addr: ":" + port,
+	}
+	// defer srv.Shutdown(ctx)
+	http.HandleFunc("/", mainHandler)
+	http.HandleFunc("/form-submit", formHandler)
+	go func() {
+		fmt.Printf("now serving on port %s...\n", port)
+		fmt.Printf("%v", srv.ListenAndServe())
+
+		fmt.Println("stopped serving.")
+	}()
+
+	return srv
 }
