@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Panacea</title>
+</head>
+
+<body>
+    <h1>Submit File and Name</h1>
+    <p>Identity: {{.Identity}}</p>
+    <form action="/your-api-endpoint" method="POST" enctype="multipart/form-data">
+        <label for="name">Name (optional):</label><br />
+        <input type="text" id="name" name="name" /><br /><br />
+
+        <label for="file">Choose a file (optional):</label><br />
+        <input type="file" id="file" name="file" /><br /><br />
+
+        <input type="submit" value="Submit" />
+    </form>
+</body>
+
+</html>

@@ -1,11 +1,12 @@
 package p2p
 
 import (
-	"bufio"
 	"context"
 	"crypto/rand"
 	"fmt"
+	"html/template"
 	"log"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -25,13 +26,16 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/arekouzounian/panacea/chain"
-	"github.com/arekouzounian/panacea/ledger"
 )
 
 const (
 	TopicName               = "panacea-test"
 	ProtoPrefix protocol.ID = "panacea"
 )
+
+type WebInfoHolder struct {
+	Identity string
+}
 
 func StartPeer() {
 	ctx, cancel := context.WithCancel(context.Background())
@@ -111,10 +115,10 @@ func StartPeer() {
 		}
 	}
 
-	marshalPeerID, err := h.ID().MarshalBinary()
-	if err != nil {
-		panic(err)
-	}
+	// marshalPeerID, err := h.ID().MarshalBinary()
+	// if err != nil {
+	// 	panic(err)
+	// }
 
 	// pubsub
 	psOpts := []pubsub.Option{
@@ -123,8 +127,8 @@ func StartPeer() {
 		pubsub.WithMessageIdFn(pubsub.DefaultMsgIdFn),
 	}
 
-	state := ledger.NewInMemoryStateHandler()
-	bc, err := chain.NewLinkedListBC(state)
+	// state := ledger.NewInMemoryStateHandler()
+	// bc, err := chain.NewLinkedListBC(state)
 
 	ps, err := pubsub.NewGossipSub(ctx, h, psOpts...)
 	if err != nil {
@@ -149,70 +153,95 @@ func StartPeer() {
 
 	go read_from_sub(ctx, sub, h)
 
-	// Enter REPL loop to get user input
-
 	ch := make(chan os.Signal, 1)
 	signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM)
 
-	scanner := bufio.NewScanner(os.Stdin)
-outer_loop:
-	for {
-		select {
-		case <-ch:
-			log.Println("Received signal, shutting down...")
-			break outer_loop
-		default:
-			fmt.Print("Enter a message: ")
-			scanner.Scan()
-			msg := scanner.Text()
-
-			if len(msg) < 1 {
-				continue
-			}
-
-			switch msg {
-			// case "1":
-			// 	fmt.Println("Sending history request")
-			// 	marshal := chain.Request{
-			// 		PeerID:    h.ID().String(),
-			// 		Timestamp: time.Now().Unix(),
-			// 		RequestType: &chain.Request_History_Request{
-			// 			History_Request: &chain.Request_ChainHistory{
-			// 				AfterHash: chain.CHAIN_ROOT,
-			// 			},
-			// 		},
-			// 	}
-
-			// 	req_chan <- &marshal
-			default:
-				inner_record := chain.EmptyRecord{
-					Msg: msg,
-				}
-
-				outer_record := chain.BlockRecord{
-					Timestamp:       time.Now().Unix(),
-					InitiatorPeerID: marshalPeerID,
-					InnerRecord: &chain.BlockRecord_TestRecord{
-						TestRecord: &inner_record,
-					},
-				}
-
-				block, err := SignRecordToBlock(sk, &outer_record)
-				if err != nil {
-					fmt.Printf("Error signing record: %s\n", err)
-					continue
-				}
-
-				err = bc.AddBlock(block)
-				if err != nil {
-					fmt.Printf("Unable to extend blockchain: %s", err)
-				}
-
-				fmt.Println()
-				bc.PrintChain()
-			}
-		}
+	// Web Interface testing -- move later
+	info := WebInfoHolder{
+		Identity: h.ID().String(),
 	}
+
+	mainHandler := func(w http.ResponseWriter, r *http.Request) {
+		t, err := template.ParseFiles("p2p/index.html")
+		if err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
+
+		t.Execute(w, info)
+	}
+	srv := &http.Server{
+		Addr: ":8082",
+	}
+	defer srv.Shutdown(ctx)
+	http.HandleFunc("/", mainHandler)
+	go func() {
+		srv.ListenAndServe()
+	}()
+	// End Web Interface
+
+	<-ch
+	log.Println("Received shutdown signal, attempting graceful shutdown...")
+
+	// outer_loop:
+
+	// 	for {
+	// 		select {
+	// 		case <-ch:
+	// 			log.Println("Received signal, shutting down...")
+	// 			break outer_loop
+	// 		default:
+	// 			fmt.Print("Enter a message: ")
+	// 			scanner.Scan()
+	// 			msg := scanner.Text()
+
+	// 			if len(msg) < 1 {
+	// 				continue
+	// 			}
+
+	// 			switch msg {
+	// case "1":
+	// 	fmt.Println("Sending history request")
+	// 	marshal := chain.Request{
+	// 		PeerID:    h.ID().String(),
+	// 		Timestamp: time.Now().Unix(),
+	// 		RequestType: &chain.Request_History_Request{
+	// 			History_Request: &chain.Request_ChainHistory{
+	// 				AfterHash: chain.CHAIN_ROOT,
+	// 			},
+	// 		},
+	// 	}
+
+	// 	req_chan <- &marshal
+	// 	default:
+	// 		inner_record := chain.EmptyRecord{
+	// 			Msg: msg,
+	// 		}
+
+	// 		outer_record := chain.BlockRecord{
+	// 			Timestamp:       time.Now().Unix(),
+	// 			InitiatorPeerID: marshalPeerID,
+	// 			InnerRecord: &chain.BlockRecord_TestRecord{
+	// 				TestRecord: &inner_record,
+	// 			},
+	// 		}
+
+	// 		block, err := SignRecordToBlock(sk, &outer_record)
+	// 		if err != nil {
+	// 			fmt.Printf("Error signing record: %s\n", err)
+	// 			continue
+	// 		}
+
+	// 		err = bc.AddBlock(block)
+	// 		if err != nil {
+	// 			fmt.Printf("Unable to extend blockchain: %s", err)
+	// 		}
+
+	// 		fmt.Println()
+	// 		bc.PrintChain()
+	// 	}
+	// }
+	// }
 }
 
 func write_to_pub(req_chan <-chan *chain.Request, ctx context.Context, pub *pubsub.Topic) {
