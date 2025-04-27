@@ -4,12 +4,12 @@ import (
 	"context"
 	"crypto/rand"
 	"fmt"
-	"html/template"
 	"log"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
+	"text/template"
 	"time"
 
 	"github.com/libp2p/go-libp2p"
@@ -37,6 +37,7 @@ type WebInfoHolder struct {
 	Identity        string
 	AuthorizedPeers []string
 	FileHashes      []string
+	KnownPeerIDs    []string
 }
 
 func StartPeer(webServerPort string) {
@@ -79,8 +80,7 @@ func StartPeer(webServerPort string) {
 		panic(err)
 	}
 
-	srv := start_web_server(h, ctx, webServerPort)
-	defer srv.Shutdown(ctx)
+	defer h.Close()
 
 	// connect to the bootstrap node(s)
 	for _, addr := range bootstrapPeerList {
@@ -91,7 +91,7 @@ func StartPeer(webServerPort string) {
 		h.Connect(ctx, *pi)
 	}
 
-	// bootstrap noe should give us a list of adjacent nodes,
+	// bootstrap node should give us a list of adjacent nodes,
 	// connect to those as well.
 	// Set a short timeout and then re-advertise ourselves if needed
 	disc := drouting.NewRoutingDiscovery(idht)
@@ -123,20 +123,12 @@ func StartPeer(webServerPort string) {
 		}
 	}
 
-	// marshalPeerID, err := h.ID().MarshalBinary()
-	// if err != nil {
-	// 	panic(err)
-	// }
-
-	// pubsub
+	// pubsub; create router and spin up handler threads
 	psOpts := []pubsub.Option{
 		pubsub.WithFloodPublish(true),
 		pubsub.WithPeerExchange(true),
 		pubsub.WithMessageIdFn(pubsub.DefaultMsgIdFn),
 	}
-
-	// state := ledger.NewInMemoryStateHandler()
-	// bc, err := chain.NewLinkedListBC(state)
 
 	ps, err := pubsub.NewGossipSub(ctx, h, psOpts...)
 	if err != nil {
@@ -161,11 +153,97 @@ func StartPeer(webServerPort string) {
 
 	go read_from_sub(ctx, sub, h)
 
+	// Spin up a webserver
+	// marshalBinary, err := h.ID().MarshalBinary()
+	// if err != nil {
+	// 	panic(err)
+	// }
+
+	// state := ledger.NewInMemoryStateHandler()
+	// bc, err := chain.NewLinkedListBC(state)
+	// if err != nil {
+	// 	panic(err)
+	// }
+
+	info := WebInfoHolder{
+		Identity:        h.ID().String(),
+		FileHashes:      []string{},
+		AuthorizedPeers: []string{},
+	}
+
+	mainHandler := func(w http.ResponseWriter, r *http.Request) {
+		// peers := h.Network().Peers()
+		// info.ConnectedPeerIDs = make([]string, len(peers))
+		// for i, peer := range peers {
+		// 	info.ConnectedPeerIDs[i] = peer.String()
+		// }
+
+		t, err := template.ParseFiles("p2p/index.html")
+		if err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
+
+		t.Execute(w, info)
+	}
+	formHandler := func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != "POST" {
+			http.Error(w, "method not allowed", http.StatusForbidden)
+			return
+		}
+
+		// max 10mb mem
+		err := r.ParseMultipartForm(10 << 20)
+		if err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
+
+		// newRecord := chain.BlockRecord{
+		// 	Timestamp:       time.Now().Unix(),
+		// 	InitiatorPeerID: hostBinary,
+		// }
+
+		name := r.FormValue("name")
+		if name != "" {
+			info.AuthorizedPeers = append(info.AuthorizedPeers, name)
+			// newRecord.InnerRecord = &chain.BlockRecord_UpdatePeers{
+			// 	UpdatePeers: &chain.AuthorizedPeerUpdate{
+			// 		// AddedPeerIDs: [],
+			// 	},
+			// }
+		}
+
+		_, header, err := r.FormFile("file")
+		if err != nil && err != http.ErrMissingFile {
+			http.Error(w, err.Error(), 500)
+			return
+		}
+
+		// edge case: both form fields maliciously submitted
+		// in this case we only use the name value
+		if name == "" && header != nil {
+			info.FileHashes = append(info.FileHashes, header.Filename)
+		}
+	}
+
+	srv := &http.Server{
+		Addr: ":" + webServerPort,
+	}
+	// defer srv.Shutdown(ctx)
+	http.HandleFunc("/", mainHandler)
+	http.HandleFunc("/form-submit", formHandler)
+	go func() {
+		fmt.Printf("now serving on port %s...\n", webServerPort)
+		fmt.Printf("%v", srv.ListenAndServe())
+	}()
+	defer srv.Shutdown(ctx)
+
+	// exit channel
 	ch := make(chan os.Signal, 1)
 	signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM)
 
-	// start_web_server(h, ctx, webServerPort)
-
+	// reached on exit condition
 	<-ch
 	log.Println("Received shutdown signal, attempting graceful shutdown...")
 
@@ -220,65 +298,4 @@ outer_sub_loop:
 		}
 
 	}
-}
-
-func start_web_server(h host.Host, ctx context.Context, port string) *http.Server {
-	info := WebInfoHolder{
-		Identity:        h.ID().String(),
-		FileHashes:      []string{},
-		AuthorizedPeers: []string{},
-	}
-
-	mainHandler := func(w http.ResponseWriter, r *http.Request) {
-		t, err := template.ParseFiles("p2p/index.html")
-		if err != nil {
-			http.Error(w, err.Error(), 500)
-			return
-		}
-
-		t.Execute(w, info)
-	}
-	formHandler := func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != "POST" {
-			http.Error(w, "method not allowed", http.StatusForbidden)
-			return
-		}
-
-		// max 10mb mem
-		err := r.ParseMultipartForm(10 << 20)
-		if err != nil {
-			http.Error(w, err.Error(), 500)
-			return
-		}
-
-		name := r.FormValue("name")
-		if name != "" {
-			info.AuthorizedPeers = append(info.AuthorizedPeers, name)
-		}
-
-		_, header, err := r.FormFile("file")
-		if err != nil && err != http.ErrMissingFile {
-			http.Error(w, err.Error(), 500)
-			return
-		}
-
-		if header != nil {
-			info.FileHashes = append(info.FileHashes, header.Filename)
-		}
-	}
-
-	srv := &http.Server{
-		Addr: ":" + port,
-	}
-	// defer srv.Shutdown(ctx)
-	http.HandleFunc("/", mainHandler)
-	http.HandleFunc("/form-submit", formHandler)
-	go func() {
-		fmt.Printf("now serving on port %s...\n", port)
-		fmt.Printf("%v", srv.ListenAndServe())
-
-		fmt.Println("stopped serving.")
-	}()
-
-	return srv
 }

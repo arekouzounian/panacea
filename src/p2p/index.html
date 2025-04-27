@@ -5,38 +5,84 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Panacea</title>
+    <style>
+        .hidden {
+            display: none;
+        }
+    </style>
 </head>
 
 <body>
     <h1>Submit File and Name</h1>
     <p>Peer ID: {{.Identity}}</p>
     <form id="uploadForm">
-        <label for="name">Name (optional):</label><br />
-        <input type="text" id="name" name="name" /><br /><br />
+        <label for="choice">Choose an option:</label><br />
+        <select id="choice" name="choice">
+            <option value="name">Submit Name</option>
+            <option value="file">Submit File</option>
+        </select><br /><br />
 
-        <label for="file">Choose a file (optional):</label><br />
-        <input type="file" id="file" name="file" /><br /><br />
+        <div id="nameField">
+            <label for="name">Name:</label><br />
+            <input type="text" id="name" name="name" /><br /><br />
+            <div id="peerIDField">
+                <p><b>Authorized Peers</b></p>
+                {{range .AuthorizedPeers}}
+                <p>{{.}}</p>
+                {{end}}
+            </div>
+
+            <div>
+                <p><b>Currently Connected Peers</b></p>
+                {{range .ConnectedPeerIDs}}
+                <p>{{.}}</p>
+                {{end}}
+            </div>
+        </div>
+
+        <div id="fileField" class="hidden">
+            <label for="file">Choose a file:</label><br />
+            <input type="file" id="file" name="file" /><br /><br />
+            <div id="fileHashField">
+                {{range .FileHashes}}
+                <p>{{.}}</p>
+                {{end}}
+            </div>
+
+        </div>
+
 
         <input type="submit" value="Submit" />
-
-        <div id="auth-entities-holder">
-            <h3>Authorized Entities</h3>
-            {{range .AuthorizedPeers}}
-            <p>{{.}}</p>
-            {{end}}
-        </div>
-
-        <div id="added-files-holder">
-            <h3>Records</h3>
-            {{range .FileHashes}}
-            <p>{{.}}</p>
-            {{end}}
-        </div>
-
-
     </form>
 
     <script>
+        const choiceSelect = document.getElementById('choice');
+        const nameField = document.getElementById('nameField');
+        const fileField = document.getElementById('fileField');
+
+
+        function updateFields(choice) {
+            if (choice === 'name') {
+                nameField.classList.remove('hidden');
+                fileField.classList.add('hidden');
+            } else if (choice === 'file') {
+                fileField.classList.remove('hidden');
+                nameField.classList.add('hidden');
+            }
+        }
+
+        const savedChoice = localStorage.getItem('selectedChoice');
+        if (savedChoice) {
+            choiceSelect.value = savedChoice;
+            updateFields(savedChoice);
+        }
+
+        choiceSelect.addEventListener('change', () => {
+            const choice = choiceSelect.value;
+            updateFields(choice);
+            localStorage.setItem('selectedChoice', choice); // Save to localStorage
+        });
+
         document.getElementById('uploadForm').addEventListener('submit', async (e) => {
             e.preventDefault(); // Prevent page reload
 
@@ -52,6 +98,10 @@
                 if (response.ok) {
                     alert('Form submitted successfully!');
                     form.reset();
+
+                    const savedChoice = localStorage.getItem('selectedChoice') || 'name';
+                    choiceSelect.value = savedChoice;
+                    updateFields(savedChoice);
                 } else {
                     alert('Submission failed.');
                 }

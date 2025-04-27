@@ -24,7 +24,7 @@ const (
 type BlockRecord struct {
 	state             protoimpl.MessageState `protogen:"open.v1"`
 	Timestamp         int64                  `protobuf:"varint,1,opt,name=Timestamp,proto3" json:"Timestamp,omitempty"`
-	InitiatorPeerID   []byte                 `protobuf:"bytes,2,opt,name=InitiatorPeerID,proto3" json:"InitiatorPeerID,omitempty"`
+	InitiatorPeerID   string                 `protobuf:"bytes,2,opt,name=InitiatorPeerID,proto3" json:"InitiatorPeerID,omitempty"`
 	PreviousBlockHash []byte                 `protobuf:"bytes,3,opt,name=PreviousBlockHash,proto3,oneof" json:"PreviousBlockHash,omitempty"`
 	// Types that are valid to be assigned to InnerRecord:
 	//
@@ -73,11 +73,11 @@ func (x *BlockRecord) GetTimestamp() int64 {
 	return 0
 }
 
-func (x *BlockRecord) GetInitiatorPeerID() []byte {
+func (x *BlockRecord) GetInitiatorPeerID() string {
 	if x != nil {
 		return x.InitiatorPeerID
 	}
-	return nil
+	return ""
 }
 
 func (x *BlockRecord) GetPreviousBlockHash() []byte {
@@ -666,7 +666,7 @@ const file_messages_proto_rawDesc = "" +
 	"\x0emessages.proto\"\xd3\x02\n" +
 	"\vBlockRecord\x12\x1c\n" +
 	"\tTimestamp\x18\x01 \x01(\x03R\tTimestamp\x12(\n" +
-	"\x0fInitiatorPeerID\x18\x02 \x01(\fR\x0fInitiatorPeerID\x121\n" +
+	"\x0fInitiatorPeerID\x18\x02 \x01(\tR\x0fInitiatorPeerID\x121\n" +
 	"\x11PreviousBlockHash\x18\x03 \x01(\fH\x01R\x11PreviousBlockHash\x88\x01\x01\x129\n" +
 	"\rUpdateRecords\x18\x04 \x01(\v2\x11.PeerRecordUpdateH\x00R\rUpdateRecords\x129\n" +
 	"\vUpdatePeers\x18\x05 \x01(\v2\x15.AuthorizedPeerUpdateH\x00R\vUpdatePeers\x12.\n" +
