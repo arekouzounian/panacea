@@ -21,38 +21,28 @@
             <option value="name">Submit Name</option>
             <option value="file">Submit File</option>
         </select><br /><br />
-
         <div id="nameField">
             <label for="name">Name:</label><br />
             <input type="text" id="name" name="name" /><br /><br />
-            <div id="peerIDField">
-                <p><b>Authorized Peers</b></p>
-                {{range .AuthorizedPeers}}
-                <p>{{.}}</p>
-                {{end}}
-            </div>
-
-            <div>
-                <p><b>Currently Connected Peers</b></p>
-                {{range .ConnectedPeerIDs}}
-                <p>{{.}}</p>
-                {{end}}
-            </div>
         </div>
-
         <div id="fileField" class="hidden">
             <label for="file">Choose a file:</label><br />
             <input type="file" id="file" name="file" /><br /><br />
-            <div id="fileHashField">
-                {{range .FileHashes}}
-                <p>{{.}}</p>
-                {{end}}
-            </div>
-
         </div>
-
-
         <input type="submit" value="Submit" />
+
+        <div id="peerIDField">
+            <p><b>Authorized Peers</b></p>
+            {{range .AuthorizedPeers}}
+            <p>{{.}}</p>
+            {{end}}
+        </div>
+        <div id="fileHashField">
+            <p><b>File Hashes</b></p>
+            {{range .FileHashes}}
+            <p>{{.}}</p>
+            {{end}}
+        </div>
     </form>
 
     <script>

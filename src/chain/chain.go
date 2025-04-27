@@ -7,7 +7,6 @@ import (
 	"os"
 
 	"github.com/arekouzounian/panacea/ledger"
-	"github.com/libp2p/go-libp2p/core/peer"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -130,10 +129,6 @@ func (b *BlockChain) PrintChain() {
 	i := 0
 	for curr := b.root; curr != nil; curr = curr.next {
 		rec := curr.block.Record
-		initiator, err := peer.IDFromBytes(rec.InitiatorPeerID)
-		if err != nil {
-			panic(err)
-		}
 
 		var recType string
 		switch rec.InnerRecord.(type) {
@@ -147,7 +142,7 @@ func (b *BlockChain) PrintChain() {
 			recType = "unknown record"
 		}
 
-		fmt.Printf("Block %d:\n\tInitiator: %s\n\tRecord Type: %s\n", i, initiator.String(), recType)
+		fmt.Printf("Block %d:\n\tInitiator: %s\n\tRecord Type: %s\n", i, rec.InitiatorPeerID, recType)
 		i += 1
 	}
 }

@@ -3,7 +3,9 @@ package p2p
 import (
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -26,6 +28,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/arekouzounian/panacea/chain"
+	"github.com/arekouzounian/panacea/ledger"
 )
 
 const (
@@ -159,11 +162,11 @@ func StartPeer(webServerPort string) {
 	// 	panic(err)
 	// }
 
-	// state := ledger.NewInMemoryStateHandler()
-	// bc, err := chain.NewLinkedListBC(state)
-	// if err != nil {
-	// 	panic(err)
-	// }
+	state := ledger.NewInMemoryStateHandler()
+	bc, err := chain.NewLinkedListBC(state)
+	if err != nil {
+		panic(err)
+	}
 
 	info := WebInfoHolder{
 		Identity:        h.ID().String(),
@@ -199,22 +202,29 @@ func StartPeer(webServerPort string) {
 			return
 		}
 
-		// newRecord := chain.BlockRecord{
-		// 	Timestamp:       time.Now().Unix(),
-		// 	InitiatorPeerID: hostBinary,
-		// }
+		newRecord := chain.BlockRecord{
+			Timestamp:       time.Now().Unix(),
+			InitiatorPeerID: info.Identity,
+		}
 
 		name := r.FormValue("name")
 		if name != "" {
+			for _, peer := range info.AuthorizedPeers {
+				if peer == name {
+					http.Error(w, "Peer already added!", 400)
+					return // skip duplicates
+				}
+			}
+
 			info.AuthorizedPeers = append(info.AuthorizedPeers, name)
-			// newRecord.InnerRecord = &chain.BlockRecord_UpdatePeers{
-			// 	UpdatePeers: &chain.AuthorizedPeerUpdate{
-			// 		// AddedPeerIDs: [],
-			// 	},
-			// }
+			newRecord.InnerRecord = &chain.BlockRecord_UpdatePeers{
+				UpdatePeers: &chain.AuthorizedPeerUpdate{
+					AddedPeerIDs: []string{name},
+				},
+			}
 		}
 
-		_, header, err := r.FormFile("file")
+		file, header, err := r.FormFile("file")
 		if err != nil && err != http.ErrMissingFile {
 			http.Error(w, err.Error(), 500)
 			return
@@ -223,8 +233,37 @@ func StartPeer(webServerPort string) {
 		// edge case: both form fields maliciously submitted
 		// in this case we only use the name value
 		if name == "" && header != nil {
-			info.FileHashes = append(info.FileHashes, header.Filename)
+			// calculate file digest
+			h := sha256.New()
+			if _, err := io.Copy(h, file); err != nil {
+				http.Error(w, err.Error(), 500)
+			}
+			hash := fmt.Sprintf(fmt.Sprintf("%x", h.Sum(nil)))
+
+			for _, existing_hash := range info.FileHashes {
+				if existing_hash == hash {
+					http.Error(w, "Hash already added!", 400)
+					return
+				}
+			}
+
+			info.FileHashes = append(info.FileHashes, hash)
+			newRecord.InnerRecord = &chain.BlockRecord_UpdateRecords{
+				UpdateRecords: &chain.PeerRecordUpdate{
+					AddedRecordHashes: []string{hash},
+				},
+			}
 		}
+
+		// publish record
+		block, err := SignRecordToBlock(sk, &newRecord)
+		if err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
+
+		bc.AddBlock(block)
+		// broadcast here
 	}
 
 	srv := &http.Server{

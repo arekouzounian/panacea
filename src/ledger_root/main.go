@@ -83,15 +83,9 @@ func main() {
 		return
 	}
 
-	marshal_id, err := id.MarshalBinary()
-	if err != nil {
-		fmt.Printf("Unable to marshal identity: %s\n", err.Error())
-		return
-	}
-
 	root := &chain.BlockRecord{
 		Timestamp:         0,
-		InitiatorPeerID:   marshal_id,
+		InitiatorPeerID:   id.String(),
 		PreviousBlockHash: nil,
 		InnerRecord:       nil,
 	}
