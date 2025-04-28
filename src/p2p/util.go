@@ -15,7 +15,7 @@ func SignRecordToBlock(sk crypto.PrivKey, rec *chain.BlockRecord) (*chain.Block,
 	}
 
 	hash := sha256.Sum256(b)
-	sig, err := sk.Sign(hash[:])
+	sig, err := sk.Sign(b)
 	if err != nil {
 		return nil, err
 	}

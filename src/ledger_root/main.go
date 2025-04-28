@@ -16,6 +16,7 @@ import (
 const (
 	KEYFILE_NAME    = "master.key"
 	PUBKEYFILE_NAME = "master.pub"
+	CHAIN_ROOT_VAL  = "panacea"
 )
 
 func loadOrCreateIdentity(path string) (crypto.PrivKey, error) {
@@ -70,6 +71,39 @@ func loadOrCreateIdentity(path string) (crypto.PrivKey, error) {
 	return crypto.UnmarshalPrivateKey(keyBytes)
 }
 
+func test_signing(input []byte) bool {
+	sk_bytes, err := os.ReadFile(KEYFILE_NAME)
+	if err != nil {
+		panic(err)
+	}
+
+	pk_bytes, err := os.ReadFile(PUBKEYFILE_NAME)
+	if err != nil {
+		panic(err)
+	}
+
+	sk, err := crypto.UnmarshalPrivateKey(sk_bytes)
+	if err != nil {
+		panic(err)
+	}
+	pk, err := crypto.UnmarshalPublicKey(pk_bytes)
+	if err != nil {
+		panic(err)
+	}
+
+	sig, err := sk.Sign(input)
+	if err != nil {
+		panic(err)
+	}
+
+	verify, err := pk.Verify(input, sig)
+	if err != nil {
+		panic(err)
+	}
+
+	return verify
+}
+
 func main() {
 	key, err := loadOrCreateIdentity(".")
 	if err != nil {
@@ -83,10 +117,12 @@ func main() {
 		return
 	}
 
+	root_hash := sha256.Sum256([]byte(CHAIN_ROOT_VAL))
+
 	root := &chain.BlockRecord{
 		Timestamp:         0,
 		InitiatorPeerID:   id.String(),
-		PreviousBlockHash: nil,
+		PreviousBlockHash: root_hash[:],
 		InnerRecord:       nil,
 	}
 
@@ -97,10 +133,14 @@ func main() {
 	}
 
 	hash := sha256.Sum256(marshal)
-	signature, err := key.Sign(hash[:])
+	signature, err := key.Sign(marshal)
 	if err != nil {
 		fmt.Printf("Unable to sign hash: %s\n", err.Error())
 		return
+	}
+
+	if !test_signing(marshal) {
+		panic(fmt.Errorf("signature invalid; verification failing"))
 	}
 
 	block := &chain.Block{

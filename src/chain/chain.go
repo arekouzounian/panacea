@@ -3,9 +3,10 @@ package chain
 import (
 	"crypto/sha256"
 	"fmt"
-	"hash"
 	"log"
 	"os"
+	"slices"
+	sync "sync"
 
 	"github.com/arekouzounian/panacea/ledger"
 	"github.com/libp2p/go-libp2p/core/crypto"
@@ -15,34 +16,53 @@ import (
 const (
 	GENESIS_BLOCK_LOC  = "ledger_root/genesis.block"
 	MASTER_PUB_KEY_LOC = "ledger_root/master.pub"
+	CHAIN_ROOT_VAL     = "panacea"
 )
 
-const (
-	// The root value of the tree.
-	CHAIN_ROOT = "panacea"
+func ValidateMarshalledGenesisBlock(block_bytes []byte) (*Block, error) {
+	keyBytes, err := os.ReadFile(MASTER_PUB_KEY_LOC)
+	if err != nil {
+		return nil, fmt.Errorf("unable to read chain public key at ./%s: %v", MASTER_PUB_KEY_LOC, err)
+	}
 
-	// This is just a precomputed SHA-256 hash of the above.
-	ROOT_SHA256_STR = "90f1adb96d94e0fcc5a619e01bced753809a841cb9c6c5707d3d6cb447b40eba"
-)
+	pubkey, err := crypto.UnmarshalPublicKey(keyBytes)
+	if err != nil {
+		return nil, fmt.Errorf("unable to unmarshal public key: %v", err)
+	}
 
-// No constant arrays in go...?
-var (
-	ROOT_SHA256           = []byte{0x90, 0xf1, 0xad, 0xb9, 0x6d, 0x94, 0xe0, 0xfc, 0xc5, 0xa6, 0x19, 0xe0, 0x1b, 0xce, 0xd7, 0x53, 0x80, 0x9a, 0x84, 0x1c, 0xb9, 0xc6, 0xc5, 0x70, 0x7d, 0x3d, 0x6c, 0xb4, 0x47, 0xb4, 0x0e, 0xba}
-	hasher      hash.Hash = sha256.New()
-)
+	var genesis Block
 
-// type BlockChain interface {
-// 	AddBlock(record *Block) error
-// 	HasBlock(hash string) error
+	err = proto.Unmarshal(block_bytes, &genesis)
+	if err != nil {
+		return nil, fmt.Errorf("unable to unmarshal genesis block: %v", err)
+	}
 
-// 	BlocksAfterHash(hash string) ([]Block, error)
-// }
+	inner_bytes, err := proto.Marshal(genesis.Record)
+	if err != nil {
+		return nil, fmt.Errorf("unable to marshal genesis block inner record: %v", err)
+	}
+
+	if verified, err := pubkey.Verify(inner_bytes, genesis.Signature); err != nil {
+		return nil, fmt.Errorf("unable to verify signature of block: %v", err)
+	} else if !verified {
+		return nil, fmt.Errorf("genesis block signature doesn't match: %v", err)
+	}
+
+	root_hash := sha256.Sum256([]byte(CHAIN_ROOT_VAL))
+
+	if !slices.Equal(genesis.Record.PreviousBlockHash, root_hash[:]) {
+		return nil, fmt.Errorf("genesis block previous hash doesn't match: got (%x), wanted %x", genesis.Record.PreviousBlockHash, root_hash)
+	}
+
+	return &genesis, nil
+}
 
 type BlockChain struct {
 	root *BlockNode
 	head *BlockNode
 
 	innerState ledger.StateHandler
+	mutex      sync.Mutex
 }
 
 type BlockNode struct {
@@ -58,31 +78,13 @@ func NewLinkedListBC(stateHandler ledger.StateHandler) (*BlockChain, error) {
 		return nil, fmt.Errorf("unable to find genesis block at ./%s: %v", GENESIS_BLOCK_LOC, err)
 	}
 
-	keyBytes, err := os.ReadFile(MASTER_PUB_KEY_LOC)
+	genesis, err := ValidateMarshalledGenesisBlock(b)
 	if err != nil {
-		return nil, fmt.Errorf("unable to read chain public key at ./%s: %v", MASTER_PUB_KEY_LOC, err)
-	}
-
-	pubkey, err := crypto.UnmarshalPublicKey(keyBytes)
-	if err != nil {
-		return nil, fmt.Errorf("unable to unmarshal public key: %v", err)
-	}
-
-	var genesis Block
-
-	err = proto.Unmarshal(b, &genesis)
-	if err != nil {
-		return nil, fmt.Errorf("unable to unmarshal genesis block: %v", err)
-	}
-
-	if verified, err := pubkey.Verify(b, genesis.Signature); err != nil {
-		return nil, fmt.Errorf("unable to verify signature of block: %v", err)
-	} else if !verified {
-		return nil, fmt.Errorf("genesis block signature doesn't match: %v", err)
+		return nil, err
 	}
 
 	rootNode := &BlockNode{
-		block: &genesis,
+		block: genesis,
 		prev:  nil,
 		next:  nil,
 	}
@@ -92,6 +94,7 @@ func NewLinkedListBC(stateHandler ledger.StateHandler) (*BlockChain, error) {
 		head: rootNode,
 
 		innerState: stateHandler,
+		mutex:      sync.Mutex{},
 	}, nil
 }
 
@@ -100,9 +103,39 @@ func (b *BlockChain) IsValidBlockAddition(record *Block) bool {
 	return false
 }
 
+// Everything should be filled in other than previous block hash
+func (b *BlockChain) AddLocalBlock(record *BlockRecord, key crypto.PrivKey) error {
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+
+	record.PreviousBlockHash = b.head.block.Hash
+
+	marshal, err := proto.Marshal(record)
+	if err != nil {
+		return err
+	}
+
+	sig, err := key.Sign(marshal)
+	if err != nil {
+		return err
+	}
+
+	digest := sha256.Sum256(marshal)
+
+	newBlock := Block{
+		Record:    record,
+		Hash:      digest[:],
+		Signature: sig,
+	}
+
+	return b.addBlock(&newBlock)
+}
+
 // Takes a block and simply extends the current linked list.
 // Doesn't provide any checking; block hashes must be validated by the user.
-func (b *BlockChain) AddBlock(record *Block) error {
+//
+// Not thread-safe. Mutex must be locked beforehand.
+func (b *BlockChain) addBlock(record *Block) error {
 	if b.head == nil {
 		return fmt.Errorf("attempting to add to a nil blockchain; no genesis block presented")
 	}

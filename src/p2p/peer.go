@@ -105,6 +105,7 @@ func StartPeer(webServerPort string) {
 		fmt.Println("Advertised ourselves to", TopicName)
 		fmt.Println("Searching for peers...")
 		peerChan, err := disc.FindPeers(ctx, TopicName)
+
 		if err != nil {
 			panic(err)
 		}
@@ -156,12 +157,6 @@ func StartPeer(webServerPort string) {
 
 	go read_from_sub(ctx, sub, h)
 
-	// Spin up a webserver
-	// marshalBinary, err := h.ID().MarshalBinary()
-	// if err != nil {
-	// 	panic(err)
-	// }
-
 	state := ledger.NewInMemoryStateHandler()
 	bc, err := chain.NewLinkedListBC(state)
 	if err != nil {
@@ -174,6 +169,7 @@ func StartPeer(webServerPort string) {
 		AuthorizedPeers: []string{},
 	}
 
+	// Spin up a webserver
 	mainHandler := func(w http.ResponseWriter, r *http.Request) {
 		// peers := h.Network().Peers()
 		// info.ConnectedPeerIDs = make([]string, len(peers))
@@ -255,16 +251,8 @@ func StartPeer(webServerPort string) {
 			}
 		}
 
-		// publish record
-		block, err := SignRecordToBlock(sk, &newRecord)
-		if err != nil {
-			http.Error(w, err.Error(), 500)
-			return
-		}
-
 		// need to:
-		// - calculate new hash: take previous block hash, hash it with the contents of the new block
-		// - sign the resultant hash
+		// - calculate new hash: get prev. block hash, add it to the new record, hash contents and sign
 		// - add to the chain
 		// for when blocks are broadcast to us:
 		// - check if the proposed hash is consistent with most recent hash
@@ -272,7 +260,8 @@ func StartPeer(webServerPort string) {
 		// 		-> check that peer signature matches
 		// 		-> add to the chain
 
-		bc.AddBlock(block)
+		bc.AddLocalBlock(&newRecord, sk)
+		bc.PrintChain()
 		// broadcast here
 	}
 

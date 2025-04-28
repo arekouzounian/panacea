@@ -23,7 +23,7 @@ option go_package = "./chain";
 message BlockRecord {
 	int64 Timestamp = 1; 
 	string InitiatorPeerID = 2; 
-	optional bytes PreviousBlockHash = 3; 
+	bytes PreviousBlockHash = 3; 
 	oneof InnerRecord {
 		PeerRecordUpdate UpdateRecords = 4; 
 		AuthorizedPeerUpdate UpdatePeers = 5;
