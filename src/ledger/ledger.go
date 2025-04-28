@@ -41,6 +41,30 @@ func NewInMemoryStateHandler() *InMemoryStateHandler {
 	}
 }
 
+// helper func: convert an []string into an []PeerIDType
+//
+// This seems inconvenient but in case we expand the peer id type
+// in the future it'll be nice to have this
+func ToPeerIDTypeSlice(conv *[]string) []PeerIDType {
+	s := make([]PeerIDType, len(*conv))
+
+	for i, id := range *conv {
+		s[i] = PeerIDType(id)
+	}
+
+	return s
+}
+
+func ToRecordHashTypeSlice(conv *[]string) []RecordHashType {
+	s := make([]RecordHashType, len(*conv))
+
+	for i, hash := range *conv {
+		s[i] = RecordHashType(hash)
+	}
+
+	return s
+}
+
 func (h *InMemoryStateHandler) AddAuthorizedEntities(EntityID PeerIDType, AuthorizedEntities []PeerIDType) {
 	if _, exists := h.authorizedEntityMap[EntityID]; !exists {
 		h.authorizedEntityMap[EntityID] = make(EntityAuthSet)

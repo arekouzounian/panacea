@@ -105,6 +105,7 @@ func main() {
 
 	block := &chain.Block{
 		Record:    root,
+		Hash:      hash[:],
 		Signature: signature,
 	}
 

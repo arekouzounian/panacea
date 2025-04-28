@@ -33,7 +33,8 @@ message BlockRecord {
 
 message Block {
 	BlockRecord Record = 1; 
-	bytes Signature = 2; 
+	bytes Hash = 2;
+	bytes Signature = 3;
 }
 
 message Request {

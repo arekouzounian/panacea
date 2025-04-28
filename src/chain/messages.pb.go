@@ -146,7 +146,8 @@ func (*BlockRecord_TestRecord) isBlockRecord_InnerRecord() {}
 type Block struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Record        *BlockRecord           `protobuf:"bytes,1,opt,name=Record,proto3" json:"Record,omitempty"`
-	Signature     []byte                 `protobuf:"bytes,2,opt,name=Signature,proto3" json:"Signature,omitempty"`
+	Hash          []byte                 `protobuf:"bytes,2,opt,name=Hash,proto3" json:"Hash,omitempty"`
+	Signature     []byte                 `protobuf:"bytes,3,opt,name=Signature,proto3" json:"Signature,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -184,6 +185,13 @@ func (*Block) Descriptor() ([]byte, []int) {
 func (x *Block) GetRecord() *BlockRecord {
 	if x != nil {
 		return x.Record
+	}
+	return nil
+}
+
+func (x *Block) GetHash() []byte {
+	if x != nil {
+		return x.Hash
 	}
 	return nil
 }
@@ -674,10 +682,11 @@ const file_messages_proto_rawDesc = "" +
 	"TestRecord\x18\x06 \x01(\v2\f.EmptyRecordH\x00R\n" +
 	"TestRecordB\r\n" +
 	"\vInnerRecordB\x14\n" +
-	"\x12_PreviousBlockHash\"K\n" +
+	"\x12_PreviousBlockHash\"_\n" +
 	"\x05Block\x12$\n" +
-	"\x06Record\x18\x01 \x01(\v2\f.BlockRecordR\x06Record\x12\x1c\n" +
-	"\tSignature\x18\x02 \x01(\fR\tSignature\"\xae\x02\n" +
+	"\x06Record\x18\x01 \x01(\v2\f.BlockRecordR\x06Record\x12\x12\n" +
+	"\x04Hash\x18\x02 \x01(\fR\x04Hash\x12\x1c\n" +
+	"\tSignature\x18\x03 \x01(\fR\tSignature\"\xae\x02\n" +
 	"\aRequest\x12\x1c\n" +
 	"\tTimestamp\x18\x01 \x01(\x03R\tTimestamp\x12\x16\n" +
 	"\x06PeerID\x18\x02 \x01(\tR\x06PeerID\x12@\n" +

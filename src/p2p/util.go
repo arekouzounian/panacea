@@ -22,6 +22,7 @@ func SignRecordToBlock(sk crypto.PrivKey, rec *chain.BlockRecord) (*chain.Block,
 
 	return &chain.Block{
 		Record:    rec,
+		Hash:      hash[:],
 		Signature: sig,
 	}, nil
 }

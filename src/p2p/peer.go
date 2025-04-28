@@ -262,6 +262,16 @@ func StartPeer(webServerPort string) {
 			return
 		}
 
+		// need to:
+		// - calculate new hash: take previous block hash, hash it with the contents of the new block
+		// - sign the resultant hash
+		// - add to the chain
+		// for when blocks are broadcast to us:
+		// - check if the proposed hash is consistent with most recent hash
+		//		-> hash most current block w/ new block contents
+		// 		-> check that peer signature matches
+		// 		-> add to the chain
+
 		bc.AddBlock(block)
 		// broadcast here
 	}
