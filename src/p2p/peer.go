@@ -40,7 +40,6 @@ type WebInfoHolder struct {
 	Identity        string
 	AuthorizedPeers []string
 	FileHashes      []string
-	KnownPeerIDs    []string
 }
 
 func StartPeer(webServerPort string) {
@@ -127,6 +126,13 @@ func StartPeer(webServerPort string) {
 		}
 	}
 
+	// Initialize blockchain and internal state
+	state := ledger.NewInMemoryStateHandler()
+	bc, err := chain.NewLinkedListBC(state)
+	if err != nil {
+		panic(err)
+	}
+
 	// pubsub; create router and spin up handler threads
 	psOpts := []pubsub.Option{
 		pubsub.WithFloodPublish(true),
@@ -144,7 +150,7 @@ func StartPeer(webServerPort string) {
 	}
 	defer topic.Close()
 
-	req_chan := make(chan *chain.Request, 1)
+	req_chan := make(chan *chain.Block, 1)
 	defer close(req_chan)
 
 	go write_to_pub(req_chan, ctx, topic)
@@ -155,13 +161,7 @@ func StartPeer(webServerPort string) {
 	}
 	defer sub.Cancel()
 
-	go read_from_sub(ctx, sub, h)
-
-	state := ledger.NewInMemoryStateHandler()
-	bc, err := chain.NewLinkedListBC(state)
-	if err != nil {
-		panic(err)
-	}
+	go read_from_sub(ctx, sub, h, bc)
 
 	info := WebInfoHolder{
 		Identity:        h.ID().String(),
@@ -171,12 +171,6 @@ func StartPeer(webServerPort string) {
 
 	// Spin up a webserver
 	mainHandler := func(w http.ResponseWriter, r *http.Request) {
-		// peers := h.Network().Peers()
-		// info.ConnectedPeerIDs = make([]string, len(peers))
-		// for i, peer := range peers {
-		// 	info.ConnectedPeerIDs[i] = peer.String()
-		// }
-
 		t, err := template.ParseFiles("p2p/index.html")
 		if err != nil {
 			http.Error(w, err.Error(), 500)
@@ -234,7 +228,7 @@ func StartPeer(webServerPort string) {
 			if _, err := io.Copy(h, file); err != nil {
 				http.Error(w, err.Error(), 500)
 			}
-			hash := fmt.Sprintf(fmt.Sprintf("%x", h.Sum(nil)))
+			hash := fmt.Sprintf("%x", h.Sum(nil))
 
 			for _, existing_hash := range info.FileHashes {
 				if existing_hash == hash {
@@ -251,18 +245,14 @@ func StartPeer(webServerPort string) {
 			}
 		}
 
-		// need to:
-		// - calculate new hash: get prev. block hash, add it to the new record, hash contents and sign
-		// - add to the chain
-		// for when blocks are broadcast to us:
-		// - check if the proposed hash is consistent with most recent hash
-		//		-> hash most current block w/ new block contents
-		// 		-> check that peer signature matches
-		// 		-> add to the chain
+		blk, err := bc.AddLocalBlock(&newRecord, sk)
+		if err != nil {
+			fmt.Printf("Error adding local block: %v", err)
+			return
+		}
+		bc.PrintChain() // for debugging purposes
 
-		bc.AddLocalBlock(&newRecord, sk)
-		bc.PrintChain()
-		// broadcast here
+		req_chan <- blk
 	}
 
 	srv := &http.Server{
@@ -287,9 +277,8 @@ func StartPeer(webServerPort string) {
 
 }
 
-func write_to_pub(req_chan <-chan *chain.Request, ctx context.Context, pub *pubsub.Topic) {
+func write_to_pub(req_chan <-chan *chain.Block, ctx context.Context, pub *pubsub.Topic) {
 	for req := range req_chan {
-
 		encoded, err := proto.Marshal(req)
 		if err != nil {
 			panic(err)
@@ -301,7 +290,7 @@ func write_to_pub(req_chan <-chan *chain.Request, ctx context.Context, pub *pubs
 	}
 }
 
-func read_from_sub(ctx context.Context, sub *pubsub.Subscription, host host.Host) {
+func read_from_sub(ctx context.Context, sub *pubsub.Subscription, host host.Host, bc *chain.BlockChain) {
 outer_sub_loop:
 	for {
 		select {
@@ -320,19 +309,37 @@ outer_sub_loop:
 				continue
 			}
 
-			var msg chain.Request
+			fmt.Println("Received new block. Attempting to add to the chain.")
+
+			var msg chain.Block
 			err = proto.Unmarshal(m.Data, &msg)
 			if err != nil {
-				fmt.Println("Receiving error:", err.Error())
+				fmt.Printf("Receiving error: %s\n", err.Error())
 				continue
 			}
 
-			switch v := msg.RequestType.(type) {
-			case *chain.Request_Example_Request:
-				fmt.Printf("Example|%s> %s\n", msg.PeerID[len(msg.PeerID)-16:], v.Example_Request.GetContent())
-			default:
-				fmt.Printf("Received unimplemented request type: %v", v)
+			peerID, err := peer.IDFromBytes(m.From)
+			if err != nil {
+				fmt.Printf("Error unmarshalling peer: %s\n", err.Error())
+				continue
 			}
+
+			pk := host.Peerstore().PubKey(peerID)
+
+			if err = bc.AddForeignBlock(&msg, &pk); err != nil {
+				fmt.Printf("Unable to add foreign block: %s\n", err.Error())
+				continue
+			}
+
+			// switch v := msg.RequestType.(type) {
+			// case *chain.Request_Example_Request:
+			// 	fmt.Printf("Example|%s> %s\n", msg.PeerID[len(msg.PeerID)-16:], v.Example_Request.GetContent())
+			// default:
+			// 	fmt.Printf("Received unimplemented request type: %v", v)
+			// }
+
+			fmt.Println("Block successfully added. Chain state:")
+			bc.PrintChain()
 		}
 
 	}

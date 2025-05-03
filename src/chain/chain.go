@@ -98,13 +98,8 @@ func NewLinkedListBC(stateHandler ledger.StateHandler) (*BlockChain, error) {
 	}, nil
 }
 
-func (b *BlockChain) IsValidBlockAddition(record *Block) bool {
-	// TODO
-	return false
-}
-
 // Everything should be filled in other than previous block hash
-func (b *BlockChain) AddLocalBlock(record *BlockRecord, key crypto.PrivKey) error {
+func (b *BlockChain) AddLocalBlock(record *BlockRecord, key crypto.PrivKey) (*Block, error) {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
 
@@ -112,12 +107,12 @@ func (b *BlockChain) AddLocalBlock(record *BlockRecord, key crypto.PrivKey) erro
 
 	marshal, err := proto.Marshal(record)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	sig, err := key.Sign(marshal)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	digest := sha256.Sum256(marshal)
@@ -128,7 +123,52 @@ func (b *BlockChain) AddLocalBlock(record *BlockRecord, key crypto.PrivKey) erro
 		Signature: sig,
 	}
 
-	return b.addBlock(&newBlock)
+	if err = b.addBlock(&newBlock); err != nil {
+		return nil, err
+	}
+
+	return &newBlock, nil
+}
+
+func (b *BlockChain) AddForeignBlock(record *Block, key *crypto.PubKey) error {
+
+	if err := b.isValidProposedBlock(record, key); err != nil {
+		return fmt.Errorf("invalid block proposal: %s", err.Error())
+	}
+
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+
+	return b.addBlock(record)
+}
+
+func (b *BlockChain) isValidProposedBlock(record *Block, fromPubKey *crypto.PubKey) error {
+	// TODO
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+
+	marshal, err := proto.Marshal(record.Record)
+	if err != nil {
+		return err
+	}
+
+	if valid_sig, err := (*fromPubKey).Verify(marshal, record.Signature); !valid_sig || err != nil {
+		return err
+	}
+
+	// Prev block hash should match
+	if !slices.Equal(b.head.block.Hash, record.Record.PreviousBlockHash) {
+		return fmt.Errorf("previous block hash doesn't match")
+	}
+
+	// hash value should match
+	digest := sha256.Sum256(marshal)
+
+	if !slices.Equal(digest[:], record.Hash) {
+		return fmt.Errorf("inner record hash value doesn't match contents")
+	}
+
+	return nil
 }
 
 // Takes a block and simply extends the current linked list.
