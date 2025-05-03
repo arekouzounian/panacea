@@ -193,8 +193,6 @@ func (b *BlockChain) addBlock(record *Block) error {
 
 	// update internal state
 	switch v := record.Record.InnerRecord.(type) {
-	case *BlockRecord_TestRecord:
-		log.Printf("test call to blockchain state: %s", v.TestRecord.Msg)
 	case *BlockRecord_UpdatePeers:
 		log.Printf("Update Peers block added to the chain from peer %s", record.Record.InitiatorPeerID)
 		log.Printf("Added Peers: %v", v.UpdatePeers.AddedPeerIDs)
@@ -228,8 +226,6 @@ func (b *BlockChain) PrintChain() {
 
 		var recType string
 		switch rec.InnerRecord.(type) {
-		case *BlockRecord_TestRecord:
-			recType = "Test record"
 		case *BlockRecord_UpdatePeers:
 			recType = "Update Authorized Peers"
 		case *BlockRecord_UpdateRecords:

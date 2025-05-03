@@ -14,11 +14,11 @@ option go_package = "./chain";
 	- longest one is used (?)
 */
 
-// INVEST, NOW!
-// message BlockChain {
-// 	string MerkleRoot = 1; 
-// 	repeated Block Blocks = 2; 
-// }
+message Block {
+	BlockRecord Record = 1; 
+	bytes Hash = 2;
+	bytes Signature = 3;
+}
 
 message BlockRecord {
 	int64 Timestamp = 1; 
@@ -27,72 +27,41 @@ message BlockRecord {
 	oneof InnerRecord {
 		PeerRecordUpdate UpdateRecords = 4; 
 		AuthorizedPeerUpdate UpdatePeers = 5;
-		EmptyRecord TestRecord = 6;
+
+		Request RequestRecord = 6;
 	} 
 }
 
-message Block {
-	BlockRecord Record = 1; 
-	bytes Hash = 2;
-	bytes Signature = 3;
-}
 
 message Request {
-	// All blocks after this hash. 
-	// Should not be empty; should always at least have the root hash.
-	message ChainHistory {
-		string AfterHash = 1; 
-	}
-
-	message ExampleRequest {
-		string Content = 1;
-	}
-
-
-	int64 Timestamp = 1;
-	string PeerID = 2; 
-
 	oneof RequestType {
-		ChainHistory History_Request = 3;
-		ExampleRequest Example_Request = 4;
+		ChainHistory ChainHistoryRequest = 1; 
+		RecordRequestSubmit OriginRecordRequest = 2; 
+		RecordRequestAck RecordRequestResponse = 3; 
 	}
 }
 
-message EmptyRecord {
-	string Msg = 1; 
+message ChainHistory {
+	bytes AfterHash = 1; 
+}
+
+message RecordRequestSubmit {
+	string RecipientPeerID = 1;
+	bytes RecordHash = 2; 
+}
+
+message RecordRequestAck {
+	string RequesterPeerID = 1; 
+	bytes RecordHash = 2; 
+	bool RequestSuccess = 3; 
 }
 
 message PeerRecordUpdate {
 	repeated string AddedRecordHashes = 1; 
 	repeated string RemovedRecordHashes = 2;
-	// add block hash in here? 
 }
 
 message AuthorizedPeerUpdate {
 	repeated string AddedPeerIDs = 1; 
 	repeated string RemovedPeerIDs = 2; 
 }
-
-// To request records from a peer we need to generate 
-// A request ID and provide a list of hashes
-// that we want excluded. 
-// That way if we want all records the list can be left blank. 
-message PeerRecordRequest {
-	string RecipientPeerID = 1;
-	int64 RequestID = 2;  
-
-	// leave empty for all records?
-	repeated string ExcludedRecordsList = 3;
-}
-
-
-// A peer will respond to the request ID with its own response block
-// States whether or not they accept this request
-// Off-chain, information is then exchanged
-message PeerRecordRequestResponse {
-	string RequesterPeerID = 1; 
-	int64 RequestID = 2;
-
-	bool RequestAccepted = 3; 
-}
-

@@ -21,16 +21,76 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+type Block struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Record        *BlockRecord           `protobuf:"bytes,1,opt,name=Record,proto3" json:"Record,omitempty"`
+	Hash          []byte                 `protobuf:"bytes,2,opt,name=Hash,proto3" json:"Hash,omitempty"`
+	Signature     []byte                 `protobuf:"bytes,3,opt,name=Signature,proto3" json:"Signature,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Block) Reset() {
+	*x = Block{}
+	mi := &file_messages_proto_msgTypes[0]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Block) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Block) ProtoMessage() {}
+
+func (x *Block) ProtoReflect() protoreflect.Message {
+	mi := &file_messages_proto_msgTypes[0]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Block.ProtoReflect.Descriptor instead.
+func (*Block) Descriptor() ([]byte, []int) {
+	return file_messages_proto_rawDescGZIP(), []int{0}
+}
+
+func (x *Block) GetRecord() *BlockRecord {
+	if x != nil {
+		return x.Record
+	}
+	return nil
+}
+
+func (x *Block) GetHash() []byte {
+	if x != nil {
+		return x.Hash
+	}
+	return nil
+}
+
+func (x *Block) GetSignature() []byte {
+	if x != nil {
+		return x.Signature
+	}
+	return nil
+}
+
 type BlockRecord struct {
 	state             protoimpl.MessageState `protogen:"open.v1"`
 	Timestamp         int64                  `protobuf:"varint,1,opt,name=Timestamp,proto3" json:"Timestamp,omitempty"`
 	InitiatorPeerID   string                 `protobuf:"bytes,2,opt,name=InitiatorPeerID,proto3" json:"InitiatorPeerID,omitempty"`
-	PreviousBlockHash []byte                 `protobuf:"bytes,3,opt,name=PreviousBlockHash,proto3,oneof" json:"PreviousBlockHash,omitempty"`
+	PreviousBlockHash []byte                 `protobuf:"bytes,3,opt,name=PreviousBlockHash,proto3" json:"PreviousBlockHash,omitempty"`
 	// Types that are valid to be assigned to InnerRecord:
 	//
 	//	*BlockRecord_UpdateRecords
 	//	*BlockRecord_UpdatePeers
-	//	*BlockRecord_TestRecord
+	//	*BlockRecord_RequestRecord
 	InnerRecord   isBlockRecord_InnerRecord `protobuf_oneof:"InnerRecord"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -38,7 +98,7 @@ type BlockRecord struct {
 
 func (x *BlockRecord) Reset() {
 	*x = BlockRecord{}
-	mi := &file_messages_proto_msgTypes[0]
+	mi := &file_messages_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -50,7 +110,7 @@ func (x *BlockRecord) String() string {
 func (*BlockRecord) ProtoMessage() {}
 
 func (x *BlockRecord) ProtoReflect() protoreflect.Message {
-	mi := &file_messages_proto_msgTypes[0]
+	mi := &file_messages_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -63,7 +123,7 @@ func (x *BlockRecord) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BlockRecord.ProtoReflect.Descriptor instead.
 func (*BlockRecord) Descriptor() ([]byte, []int) {
-	return file_messages_proto_rawDescGZIP(), []int{0}
+	return file_messages_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *BlockRecord) GetTimestamp() int64 {
@@ -112,10 +172,10 @@ func (x *BlockRecord) GetUpdatePeers() *AuthorizedPeerUpdate {
 	return nil
 }
 
-func (x *BlockRecord) GetTestRecord() *EmptyRecord {
+func (x *BlockRecord) GetRequestRecord() *Request {
 	if x != nil {
-		if x, ok := x.InnerRecord.(*BlockRecord_TestRecord); ok {
-			return x.TestRecord
+		if x, ok := x.InnerRecord.(*BlockRecord_RequestRecord); ok {
+			return x.RequestRecord
 		}
 	}
 	return nil
@@ -133,84 +193,23 @@ type BlockRecord_UpdatePeers struct {
 	UpdatePeers *AuthorizedPeerUpdate `protobuf:"bytes,5,opt,name=UpdatePeers,proto3,oneof"`
 }
 
-type BlockRecord_TestRecord struct {
-	TestRecord *EmptyRecord `protobuf:"bytes,6,opt,name=TestRecord,proto3,oneof"`
+type BlockRecord_RequestRecord struct {
+	RequestRecord *Request `protobuf:"bytes,6,opt,name=RequestRecord,proto3,oneof"`
 }
 
 func (*BlockRecord_UpdateRecords) isBlockRecord_InnerRecord() {}
 
 func (*BlockRecord_UpdatePeers) isBlockRecord_InnerRecord() {}
 
-func (*BlockRecord_TestRecord) isBlockRecord_InnerRecord() {}
-
-type Block struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Record        *BlockRecord           `protobuf:"bytes,1,opt,name=Record,proto3" json:"Record,omitempty"`
-	Hash          []byte                 `protobuf:"bytes,2,opt,name=Hash,proto3" json:"Hash,omitempty"`
-	Signature     []byte                 `protobuf:"bytes,3,opt,name=Signature,proto3" json:"Signature,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *Block) Reset() {
-	*x = Block{}
-	mi := &file_messages_proto_msgTypes[1]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *Block) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*Block) ProtoMessage() {}
-
-func (x *Block) ProtoReflect() protoreflect.Message {
-	mi := &file_messages_proto_msgTypes[1]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use Block.ProtoReflect.Descriptor instead.
-func (*Block) Descriptor() ([]byte, []int) {
-	return file_messages_proto_rawDescGZIP(), []int{1}
-}
-
-func (x *Block) GetRecord() *BlockRecord {
-	if x != nil {
-		return x.Record
-	}
-	return nil
-}
-
-func (x *Block) GetHash() []byte {
-	if x != nil {
-		return x.Hash
-	}
-	return nil
-}
-
-func (x *Block) GetSignature() []byte {
-	if x != nil {
-		return x.Signature
-	}
-	return nil
-}
+func (*BlockRecord_RequestRecord) isBlockRecord_InnerRecord() {}
 
 type Request struct {
-	state     protoimpl.MessageState `protogen:"open.v1"`
-	Timestamp int64                  `protobuf:"varint,1,opt,name=Timestamp,proto3" json:"Timestamp,omitempty"`
-	PeerID    string                 `protobuf:"bytes,2,opt,name=PeerID,proto3" json:"PeerID,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
 	// Types that are valid to be assigned to RequestType:
 	//
-	//	*Request_History_Request
-	//	*Request_Example_Request
+	//	*Request_ChainHistoryRequest
+	//	*Request_OriginRecordRequest
+	//	*Request_RecordRequestResponse
 	RequestType   isRequest_RequestType `protobuf_oneof:"RequestType"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -246,20 +245,6 @@ func (*Request) Descriptor() ([]byte, []int) {
 	return file_messages_proto_rawDescGZIP(), []int{2}
 }
 
-func (x *Request) GetTimestamp() int64 {
-	if x != nil {
-		return x.Timestamp
-	}
-	return 0
-}
-
-func (x *Request) GetPeerID() string {
-	if x != nil {
-		return x.PeerID
-	}
-	return ""
-}
-
 func (x *Request) GetRequestType() isRequest_RequestType {
 	if x != nil {
 		return x.RequestType
@@ -267,19 +252,28 @@ func (x *Request) GetRequestType() isRequest_RequestType {
 	return nil
 }
 
-func (x *Request) GetHistory_Request() *Request_ChainHistory {
+func (x *Request) GetChainHistoryRequest() *ChainHistory {
 	if x != nil {
-		if x, ok := x.RequestType.(*Request_History_Request); ok {
-			return x.History_Request
+		if x, ok := x.RequestType.(*Request_ChainHistoryRequest); ok {
+			return x.ChainHistoryRequest
 		}
 	}
 	return nil
 }
 
-func (x *Request) GetExample_Request() *Request_ExampleRequest {
+func (x *Request) GetOriginRecordRequest() *RecordRequestSubmit {
 	if x != nil {
-		if x, ok := x.RequestType.(*Request_Example_Request); ok {
-			return x.Example_Request
+		if x, ok := x.RequestType.(*Request_OriginRecordRequest); ok {
+			return x.OriginRecordRequest
+		}
+	}
+	return nil
+}
+
+func (x *Request) GetRecordRequestResponse() *RecordRequestAck {
+	if x != nil {
+		if x, ok := x.RequestType.(*Request_RecordRequestResponse); ok {
+			return x.RecordRequestResponse
 		}
 	}
 	return nil
@@ -289,39 +283,45 @@ type isRequest_RequestType interface {
 	isRequest_RequestType()
 }
 
-type Request_History_Request struct {
-	History_Request *Request_ChainHistory `protobuf:"bytes,3,opt,name=History_Request,json=HistoryRequest,proto3,oneof"`
+type Request_ChainHistoryRequest struct {
+	ChainHistoryRequest *ChainHistory `protobuf:"bytes,1,opt,name=ChainHistoryRequest,proto3,oneof"`
 }
 
-type Request_Example_Request struct {
-	Example_Request *Request_ExampleRequest `protobuf:"bytes,4,opt,name=Example_Request,json=ExampleRequest,proto3,oneof"`
+type Request_OriginRecordRequest struct {
+	OriginRecordRequest *RecordRequestSubmit `protobuf:"bytes,2,opt,name=OriginRecordRequest,proto3,oneof"`
 }
 
-func (*Request_History_Request) isRequest_RequestType() {}
+type Request_RecordRequestResponse struct {
+	RecordRequestResponse *RecordRequestAck `protobuf:"bytes,3,opt,name=RecordRequestResponse,proto3,oneof"`
+}
 
-func (*Request_Example_Request) isRequest_RequestType() {}
+func (*Request_ChainHistoryRequest) isRequest_RequestType() {}
 
-type EmptyRecord struct {
+func (*Request_OriginRecordRequest) isRequest_RequestType() {}
+
+func (*Request_RecordRequestResponse) isRequest_RequestType() {}
+
+type ChainHistory struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Msg           string                 `protobuf:"bytes,1,opt,name=Msg,proto3" json:"Msg,omitempty"`
+	AfterHash     []byte                 `protobuf:"bytes,1,opt,name=AfterHash,proto3" json:"AfterHash,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *EmptyRecord) Reset() {
-	*x = EmptyRecord{}
+func (x *ChainHistory) Reset() {
+	*x = ChainHistory{}
 	mi := &file_messages_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *EmptyRecord) String() string {
+func (x *ChainHistory) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*EmptyRecord) ProtoMessage() {}
+func (*ChainHistory) ProtoMessage() {}
 
-func (x *EmptyRecord) ProtoReflect() protoreflect.Message {
+func (x *ChainHistory) ProtoReflect() protoreflect.Message {
 	mi := &file_messages_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -333,29 +333,141 @@ func (x *EmptyRecord) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use EmptyRecord.ProtoReflect.Descriptor instead.
-func (*EmptyRecord) Descriptor() ([]byte, []int) {
+// Deprecated: Use ChainHistory.ProtoReflect.Descriptor instead.
+func (*ChainHistory) Descriptor() ([]byte, []int) {
 	return file_messages_proto_rawDescGZIP(), []int{3}
 }
 
-func (x *EmptyRecord) GetMsg() string {
+func (x *ChainHistory) GetAfterHash() []byte {
 	if x != nil {
-		return x.Msg
+		return x.AfterHash
+	}
+	return nil
+}
+
+type RecordRequestSubmit struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	RecipientPeerID string                 `protobuf:"bytes,1,opt,name=RecipientPeerID,proto3" json:"RecipientPeerID,omitempty"`
+	RecordHash      []byte                 `protobuf:"bytes,2,opt,name=RecordHash,proto3" json:"RecordHash,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *RecordRequestSubmit) Reset() {
+	*x = RecordRequestSubmit{}
+	mi := &file_messages_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RecordRequestSubmit) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RecordRequestSubmit) ProtoMessage() {}
+
+func (x *RecordRequestSubmit) ProtoReflect() protoreflect.Message {
+	mi := &file_messages_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RecordRequestSubmit.ProtoReflect.Descriptor instead.
+func (*RecordRequestSubmit) Descriptor() ([]byte, []int) {
+	return file_messages_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *RecordRequestSubmit) GetRecipientPeerID() string {
+	if x != nil {
+		return x.RecipientPeerID
 	}
 	return ""
+}
+
+func (x *RecordRequestSubmit) GetRecordHash() []byte {
+	if x != nil {
+		return x.RecordHash
+	}
+	return nil
+}
+
+type RecordRequestAck struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	RequesterPeerID string                 `protobuf:"bytes,1,opt,name=RequesterPeerID,proto3" json:"RequesterPeerID,omitempty"`
+	RecordHash      []byte                 `protobuf:"bytes,2,opt,name=RecordHash,proto3" json:"RecordHash,omitempty"`
+	RequestSuccess  bool                   `protobuf:"varint,3,opt,name=RequestSuccess,proto3" json:"RequestSuccess,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *RecordRequestAck) Reset() {
+	*x = RecordRequestAck{}
+	mi := &file_messages_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RecordRequestAck) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RecordRequestAck) ProtoMessage() {}
+
+func (x *RecordRequestAck) ProtoReflect() protoreflect.Message {
+	mi := &file_messages_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RecordRequestAck.ProtoReflect.Descriptor instead.
+func (*RecordRequestAck) Descriptor() ([]byte, []int) {
+	return file_messages_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *RecordRequestAck) GetRequesterPeerID() string {
+	if x != nil {
+		return x.RequesterPeerID
+	}
+	return ""
+}
+
+func (x *RecordRequestAck) GetRecordHash() []byte {
+	if x != nil {
+		return x.RecordHash
+	}
+	return nil
+}
+
+func (x *RecordRequestAck) GetRequestSuccess() bool {
+	if x != nil {
+		return x.RequestSuccess
+	}
+	return false
 }
 
 type PeerRecordUpdate struct {
 	state               protoimpl.MessageState `protogen:"open.v1"`
 	AddedRecordHashes   []string               `protobuf:"bytes,1,rep,name=AddedRecordHashes,proto3" json:"AddedRecordHashes,omitempty"`
-	RemovedRecordHashes []string               `protobuf:"bytes,2,rep,name=RemovedRecordHashes,proto3" json:"RemovedRecordHashes,omitempty"` // add block hash in here?
+	RemovedRecordHashes []string               `protobuf:"bytes,2,rep,name=RemovedRecordHashes,proto3" json:"RemovedRecordHashes,omitempty"`
 	unknownFields       protoimpl.UnknownFields
 	sizeCache           protoimpl.SizeCache
 }
 
 func (x *PeerRecordUpdate) Reset() {
 	*x = PeerRecordUpdate{}
-	mi := &file_messages_proto_msgTypes[4]
+	mi := &file_messages_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -367,7 +479,7 @@ func (x *PeerRecordUpdate) String() string {
 func (*PeerRecordUpdate) ProtoMessage() {}
 
 func (x *PeerRecordUpdate) ProtoReflect() protoreflect.Message {
-	mi := &file_messages_proto_msgTypes[4]
+	mi := &file_messages_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -380,7 +492,7 @@ func (x *PeerRecordUpdate) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PeerRecordUpdate.ProtoReflect.Descriptor instead.
 func (*PeerRecordUpdate) Descriptor() ([]byte, []int) {
-	return file_messages_proto_rawDescGZIP(), []int{4}
+	return file_messages_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *PeerRecordUpdate) GetAddedRecordHashes() []string {
@@ -407,7 +519,7 @@ type AuthorizedPeerUpdate struct {
 
 func (x *AuthorizedPeerUpdate) Reset() {
 	*x = AuthorizedPeerUpdate{}
-	mi := &file_messages_proto_msgTypes[5]
+	mi := &file_messages_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -419,7 +531,7 @@ func (x *AuthorizedPeerUpdate) String() string {
 func (*AuthorizedPeerUpdate) ProtoMessage() {}
 
 func (x *AuthorizedPeerUpdate) ProtoReflect() protoreflect.Message {
-	mi := &file_messages_proto_msgTypes[5]
+	mi := &file_messages_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -432,7 +544,7 @@ func (x *AuthorizedPeerUpdate) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AuthorizedPeerUpdate.ProtoReflect.Descriptor instead.
 func (*AuthorizedPeerUpdate) Descriptor() ([]byte, []int) {
-	return file_messages_proto_rawDescGZIP(), []int{5}
+	return file_messages_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *AuthorizedPeerUpdate) GetAddedPeerIDs() []string {
@@ -449,270 +561,47 @@ func (x *AuthorizedPeerUpdate) GetRemovedPeerIDs() []string {
 	return nil
 }
 
-// To request records from a peer we need to generate
-// A request ID and provide a list of hashes
-// that we want excluded.
-// That way if we want all records the list can be left blank.
-type PeerRecordRequest struct {
-	state           protoimpl.MessageState `protogen:"open.v1"`
-	RecipientPeerID string                 `protobuf:"bytes,1,opt,name=RecipientPeerID,proto3" json:"RecipientPeerID,omitempty"`
-	RequestID       int64                  `protobuf:"varint,2,opt,name=RequestID,proto3" json:"RequestID,omitempty"`
-	// leave empty for all records?
-	ExcludedRecordsList []string `protobuf:"bytes,3,rep,name=ExcludedRecordsList,proto3" json:"ExcludedRecordsList,omitempty"`
-	unknownFields       protoimpl.UnknownFields
-	sizeCache           protoimpl.SizeCache
-}
-
-func (x *PeerRecordRequest) Reset() {
-	*x = PeerRecordRequest{}
-	mi := &file_messages_proto_msgTypes[6]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *PeerRecordRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*PeerRecordRequest) ProtoMessage() {}
-
-func (x *PeerRecordRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_messages_proto_msgTypes[6]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use PeerRecordRequest.ProtoReflect.Descriptor instead.
-func (*PeerRecordRequest) Descriptor() ([]byte, []int) {
-	return file_messages_proto_rawDescGZIP(), []int{6}
-}
-
-func (x *PeerRecordRequest) GetRecipientPeerID() string {
-	if x != nil {
-		return x.RecipientPeerID
-	}
-	return ""
-}
-
-func (x *PeerRecordRequest) GetRequestID() int64 {
-	if x != nil {
-		return x.RequestID
-	}
-	return 0
-}
-
-func (x *PeerRecordRequest) GetExcludedRecordsList() []string {
-	if x != nil {
-		return x.ExcludedRecordsList
-	}
-	return nil
-}
-
-// A peer will respond to the request ID with its own response block
-// States whether or not they accept this request
-// Off-chain, information is then exchanged
-type PeerRecordRequestResponse struct {
-	state           protoimpl.MessageState `protogen:"open.v1"`
-	RequesterPeerID string                 `protobuf:"bytes,1,opt,name=RequesterPeerID,proto3" json:"RequesterPeerID,omitempty"`
-	RequestID       int64                  `protobuf:"varint,2,opt,name=RequestID,proto3" json:"RequestID,omitempty"`
-	RequestAccepted bool                   `protobuf:"varint,3,opt,name=RequestAccepted,proto3" json:"RequestAccepted,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
-}
-
-func (x *PeerRecordRequestResponse) Reset() {
-	*x = PeerRecordRequestResponse{}
-	mi := &file_messages_proto_msgTypes[7]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *PeerRecordRequestResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*PeerRecordRequestResponse) ProtoMessage() {}
-
-func (x *PeerRecordRequestResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_messages_proto_msgTypes[7]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use PeerRecordRequestResponse.ProtoReflect.Descriptor instead.
-func (*PeerRecordRequestResponse) Descriptor() ([]byte, []int) {
-	return file_messages_proto_rawDescGZIP(), []int{7}
-}
-
-func (x *PeerRecordRequestResponse) GetRequesterPeerID() string {
-	if x != nil {
-		return x.RequesterPeerID
-	}
-	return ""
-}
-
-func (x *PeerRecordRequestResponse) GetRequestID() int64 {
-	if x != nil {
-		return x.RequestID
-	}
-	return 0
-}
-
-func (x *PeerRecordRequestResponse) GetRequestAccepted() bool {
-	if x != nil {
-		return x.RequestAccepted
-	}
-	return false
-}
-
-// All blocks after this hash.
-// Should not be empty; should always at least have the root hash.
-type Request_ChainHistory struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	AfterHash     string                 `protobuf:"bytes,1,opt,name=AfterHash,proto3" json:"AfterHash,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *Request_ChainHistory) Reset() {
-	*x = Request_ChainHistory{}
-	mi := &file_messages_proto_msgTypes[8]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *Request_ChainHistory) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*Request_ChainHistory) ProtoMessage() {}
-
-func (x *Request_ChainHistory) ProtoReflect() protoreflect.Message {
-	mi := &file_messages_proto_msgTypes[8]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use Request_ChainHistory.ProtoReflect.Descriptor instead.
-func (*Request_ChainHistory) Descriptor() ([]byte, []int) {
-	return file_messages_proto_rawDescGZIP(), []int{2, 0}
-}
-
-func (x *Request_ChainHistory) GetAfterHash() string {
-	if x != nil {
-		return x.AfterHash
-	}
-	return ""
-}
-
-type Request_ExampleRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Content       string                 `protobuf:"bytes,1,opt,name=Content,proto3" json:"Content,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *Request_ExampleRequest) Reset() {
-	*x = Request_ExampleRequest{}
-	mi := &file_messages_proto_msgTypes[9]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *Request_ExampleRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*Request_ExampleRequest) ProtoMessage() {}
-
-func (x *Request_ExampleRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_messages_proto_msgTypes[9]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use Request_ExampleRequest.ProtoReflect.Descriptor instead.
-func (*Request_ExampleRequest) Descriptor() ([]byte, []int) {
-	return file_messages_proto_rawDescGZIP(), []int{2, 1}
-}
-
-func (x *Request_ExampleRequest) GetContent() string {
-	if x != nil {
-		return x.Content
-	}
-	return ""
-}
-
 var File_messages_proto protoreflect.FileDescriptor
 
 const file_messages_proto_rawDesc = "" +
 	"\n" +
-	"\x0emessages.proto\"\xd3\x02\n" +
-	"\vBlockRecord\x12\x1c\n" +
-	"\tTimestamp\x18\x01 \x01(\x03R\tTimestamp\x12(\n" +
-	"\x0fInitiatorPeerID\x18\x02 \x01(\tR\x0fInitiatorPeerID\x121\n" +
-	"\x11PreviousBlockHash\x18\x03 \x01(\fH\x01R\x11PreviousBlockHash\x88\x01\x01\x129\n" +
-	"\rUpdateRecords\x18\x04 \x01(\v2\x11.PeerRecordUpdateH\x00R\rUpdateRecords\x129\n" +
-	"\vUpdatePeers\x18\x05 \x01(\v2\x15.AuthorizedPeerUpdateH\x00R\vUpdatePeers\x12.\n" +
-	"\n" +
-	"TestRecord\x18\x06 \x01(\v2\f.EmptyRecordH\x00R\n" +
-	"TestRecordB\r\n" +
-	"\vInnerRecordB\x14\n" +
-	"\x12_PreviousBlockHash\"_\n" +
+	"\x0emessages.proto\"_\n" +
 	"\x05Block\x12$\n" +
 	"\x06Record\x18\x01 \x01(\v2\f.BlockRecordR\x06Record\x12\x12\n" +
 	"\x04Hash\x18\x02 \x01(\fR\x04Hash\x12\x1c\n" +
-	"\tSignature\x18\x03 \x01(\fR\tSignature\"\xae\x02\n" +
-	"\aRequest\x12\x1c\n" +
-	"\tTimestamp\x18\x01 \x01(\x03R\tTimestamp\x12\x16\n" +
-	"\x06PeerID\x18\x02 \x01(\tR\x06PeerID\x12@\n" +
-	"\x0fHistory_Request\x18\x03 \x01(\v2\x15.Request.ChainHistoryH\x00R\x0eHistoryRequest\x12B\n" +
-	"\x0fExample_Request\x18\x04 \x01(\v2\x17.Request.ExampleRequestH\x00R\x0eExampleRequest\x1a,\n" +
+	"\tSignature\x18\x03 \x01(\fR\tSignature\"\xba\x02\n" +
+	"\vBlockRecord\x12\x1c\n" +
+	"\tTimestamp\x18\x01 \x01(\x03R\tTimestamp\x12(\n" +
+	"\x0fInitiatorPeerID\x18\x02 \x01(\tR\x0fInitiatorPeerID\x12,\n" +
+	"\x11PreviousBlockHash\x18\x03 \x01(\fR\x11PreviousBlockHash\x129\n" +
+	"\rUpdateRecords\x18\x04 \x01(\v2\x11.PeerRecordUpdateH\x00R\rUpdateRecords\x129\n" +
+	"\vUpdatePeers\x18\x05 \x01(\v2\x15.AuthorizedPeerUpdateH\x00R\vUpdatePeers\x120\n" +
+	"\rRequestRecord\x18\x06 \x01(\v2\b.RequestH\x00R\rRequestRecordB\r\n" +
+	"\vInnerRecord\"\xf0\x01\n" +
+	"\aRequest\x12A\n" +
+	"\x13ChainHistoryRequest\x18\x01 \x01(\v2\r.ChainHistoryH\x00R\x13ChainHistoryRequest\x12H\n" +
+	"\x13OriginRecordRequest\x18\x02 \x01(\v2\x14.RecordRequestSubmitH\x00R\x13OriginRecordRequest\x12I\n" +
+	"\x15RecordRequestResponse\x18\x03 \x01(\v2\x11.RecordRequestAckH\x00R\x15RecordRequestResponseB\r\n" +
+	"\vRequestType\",\n" +
 	"\fChainHistory\x12\x1c\n" +
-	"\tAfterHash\x18\x01 \x01(\tR\tAfterHash\x1a*\n" +
-	"\x0eExampleRequest\x12\x18\n" +
-	"\aContent\x18\x01 \x01(\tR\aContentB\r\n" +
-	"\vRequestType\"\x1f\n" +
-	"\vEmptyRecord\x12\x10\n" +
-	"\x03Msg\x18\x01 \x01(\tR\x03Msg\"r\n" +
+	"\tAfterHash\x18\x01 \x01(\fR\tAfterHash\"_\n" +
+	"\x13RecordRequestSubmit\x12(\n" +
+	"\x0fRecipientPeerID\x18\x01 \x01(\tR\x0fRecipientPeerID\x12\x1e\n" +
+	"\n" +
+	"RecordHash\x18\x02 \x01(\fR\n" +
+	"RecordHash\"\x84\x01\n" +
+	"\x10RecordRequestAck\x12(\n" +
+	"\x0fRequesterPeerID\x18\x01 \x01(\tR\x0fRequesterPeerID\x12\x1e\n" +
+	"\n" +
+	"RecordHash\x18\x02 \x01(\fR\n" +
+	"RecordHash\x12&\n" +
+	"\x0eRequestSuccess\x18\x03 \x01(\bR\x0eRequestSuccess\"r\n" +
 	"\x10PeerRecordUpdate\x12,\n" +
 	"\x11AddedRecordHashes\x18\x01 \x03(\tR\x11AddedRecordHashes\x120\n" +
 	"\x13RemovedRecordHashes\x18\x02 \x03(\tR\x13RemovedRecordHashes\"b\n" +
 	"\x14AuthorizedPeerUpdate\x12\"\n" +
 	"\fAddedPeerIDs\x18\x01 \x03(\tR\fAddedPeerIDs\x12&\n" +
-	"\x0eRemovedPeerIDs\x18\x02 \x03(\tR\x0eRemovedPeerIDs\"\x8d\x01\n" +
-	"\x11PeerRecordRequest\x12(\n" +
-	"\x0fRecipientPeerID\x18\x01 \x01(\tR\x0fRecipientPeerID\x12\x1c\n" +
-	"\tRequestID\x18\x02 \x01(\x03R\tRequestID\x120\n" +
-	"\x13ExcludedRecordsList\x18\x03 \x03(\tR\x13ExcludedRecordsList\"\x8d\x01\n" +
-	"\x19PeerRecordRequestResponse\x12(\n" +
-	"\x0fRequesterPeerID\x18\x01 \x01(\tR\x0fRequesterPeerID\x12\x1c\n" +
-	"\tRequestID\x18\x02 \x01(\x03R\tRequestID\x12(\n" +
-	"\x0fRequestAccepted\x18\x03 \x01(\bR\x0fRequestAcceptedB\tZ\a./chainb\x06proto3"
+	"\x0eRemovedPeerIDs\x18\x02 \x03(\tR\x0eRemovedPeerIDsB\tZ\a./chainb\x06proto3"
 
 var (
 	file_messages_proto_rawDescOnce sync.Once
@@ -726,31 +615,30 @@ func file_messages_proto_rawDescGZIP() []byte {
 	return file_messages_proto_rawDescData
 }
 
-var file_messages_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
+var file_messages_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
 var file_messages_proto_goTypes = []any{
-	(*BlockRecord)(nil),               // 0: BlockRecord
-	(*Block)(nil),                     // 1: Block
-	(*Request)(nil),                   // 2: Request
-	(*EmptyRecord)(nil),               // 3: EmptyRecord
-	(*PeerRecordUpdate)(nil),          // 4: PeerRecordUpdate
-	(*AuthorizedPeerUpdate)(nil),      // 5: AuthorizedPeerUpdate
-	(*PeerRecordRequest)(nil),         // 6: PeerRecordRequest
-	(*PeerRecordRequestResponse)(nil), // 7: PeerRecordRequestResponse
-	(*Request_ChainHistory)(nil),      // 8: Request.ChainHistory
-	(*Request_ExampleRequest)(nil),    // 9: Request.ExampleRequest
+	(*Block)(nil),                // 0: Block
+	(*BlockRecord)(nil),          // 1: BlockRecord
+	(*Request)(nil),              // 2: Request
+	(*ChainHistory)(nil),         // 3: ChainHistory
+	(*RecordRequestSubmit)(nil),  // 4: RecordRequestSubmit
+	(*RecordRequestAck)(nil),     // 5: RecordRequestAck
+	(*PeerRecordUpdate)(nil),     // 6: PeerRecordUpdate
+	(*AuthorizedPeerUpdate)(nil), // 7: AuthorizedPeerUpdate
 }
 var file_messages_proto_depIdxs = []int32{
-	4, // 0: BlockRecord.UpdateRecords:type_name -> PeerRecordUpdate
-	5, // 1: BlockRecord.UpdatePeers:type_name -> AuthorizedPeerUpdate
-	3, // 2: BlockRecord.TestRecord:type_name -> EmptyRecord
-	0, // 3: Block.Record:type_name -> BlockRecord
-	8, // 4: Request.History_Request:type_name -> Request.ChainHistory
-	9, // 5: Request.Example_Request:type_name -> Request.ExampleRequest
-	6, // [6:6] is the sub-list for method output_type
-	6, // [6:6] is the sub-list for method input_type
-	6, // [6:6] is the sub-list for extension type_name
-	6, // [6:6] is the sub-list for extension extendee
-	0, // [0:6] is the sub-list for field type_name
+	1, // 0: Block.Record:type_name -> BlockRecord
+	6, // 1: BlockRecord.UpdateRecords:type_name -> PeerRecordUpdate
+	7, // 2: BlockRecord.UpdatePeers:type_name -> AuthorizedPeerUpdate
+	2, // 3: BlockRecord.RequestRecord:type_name -> Request
+	3, // 4: Request.ChainHistoryRequest:type_name -> ChainHistory
+	4, // 5: Request.OriginRecordRequest:type_name -> RecordRequestSubmit
+	5, // 6: Request.RecordRequestResponse:type_name -> RecordRequestAck
+	7, // [7:7] is the sub-list for method output_type
+	7, // [7:7] is the sub-list for method input_type
+	7, // [7:7] is the sub-list for extension type_name
+	7, // [7:7] is the sub-list for extension extendee
+	0, // [0:7] is the sub-list for field type_name
 }
 
 func init() { file_messages_proto_init() }
@@ -758,14 +646,15 @@ func file_messages_proto_init() {
 	if File_messages_proto != nil {
 		return
 	}
-	file_messages_proto_msgTypes[0].OneofWrappers = []any{
+	file_messages_proto_msgTypes[1].OneofWrappers = []any{
 		(*BlockRecord_UpdateRecords)(nil),
 		(*BlockRecord_UpdatePeers)(nil),
-		(*BlockRecord_TestRecord)(nil),
+		(*BlockRecord_RequestRecord)(nil),
 	}
 	file_messages_proto_msgTypes[2].OneofWrappers = []any{
-		(*Request_History_Request)(nil),
-		(*Request_Example_Request)(nil),
+		(*Request_ChainHistoryRequest)(nil),
+		(*Request_OriginRecordRequest)(nil),
+		(*Request_RecordRequestResponse)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
@@ -773,7 +662,7 @@ func file_messages_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_messages_proto_rawDesc), len(file_messages_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   10,
+			NumMessages:   8,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
