@@ -217,7 +217,6 @@ func main() {
 		libp2p.Identity(priv),
 		libp2p.NATPortMap(),
 		libp2p.EnableRelay(),
-		libp2p.NoSecurity,
 	)
 	if err != nil {
 		log.Fatal(err)

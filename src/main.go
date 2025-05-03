@@ -16,3 +16,12 @@ func main() {
 
 	p2p.StartPeer(PortFlag)
 }
+
+/*
+TODO
+----
+- send requests
+    - sync chain state for incoming nodes
+
+- show ledger on webpage? (stretch)
+*/

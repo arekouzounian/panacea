@@ -74,7 +74,6 @@ func StartPeer(webServerPort string) {
 			return idht, err
 		}),
 		libp2p.Identity(sk),
-		libp2p.NoSecurity, // TODO: support TLS/Noise
 	}
 
 	h, err := libp2p.New(opts...)
