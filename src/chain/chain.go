@@ -7,6 +7,7 @@ import (
 	"os"
 	"slices"
 	sync "sync"
+	"time"
 
 	"github.com/arekouzounian/panacea/ledger"
 	"github.com/libp2p/go-libp2p/core/crypto"
@@ -18,6 +19,18 @@ const (
 	MASTER_PUB_KEY_LOC = "ledger_root/master.pub"
 	CHAIN_ROOT_VAL     = "panacea"
 )
+
+var (
+	bc *BlockChain
+)
+
+func GetLocalChain() *BlockChain {
+	return bc
+}
+
+func SetLocalChain(b *BlockChain) {
+	bc = b
+}
 
 func ValidateMarshalledGenesisBlock(block_bytes []byte) (*Block, error) {
 	keyBytes, err := os.ReadFile(MASTER_PUB_KEY_LOC)
@@ -98,8 +111,60 @@ func NewLinkedListBC(stateHandler ledger.StateHandler) (*BlockChain, error) {
 	}, nil
 }
 
+func (b *BlockChain) BlocksAfterHash(hash []byte) []*Block {
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+
+	var startNode *BlockNode
+	if hash == nil {
+		startNode = b.head
+	} else {
+		curr := b.head
+		for curr != nil && !slices.Equal(curr.block.Hash, hash) {
+			curr = curr.next
+		}
+
+		if curr == nil {
+			return []*Block{}
+		}
+		startNode = curr
+	}
+
+	ret := []*Block{}
+	for startNode != nil {
+		ret = append(ret, startNode.block)
+		startNode = startNode.next
+	}
+
+	return ret
+}
+
+func (b *BlockChain) IsAuthorizedEntity(entityID string, candidateID string) bool {
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+
+	return b.innerState.EntityIsAuthorized(ledger.PeerIDType(entityID), ledger.PeerIDType(candidateID))
+}
+
 // Everything should be filled in other than previous block hash
 func (b *BlockChain) AddLocalBlock(record *BlockRecord, key crypto.PrivKey) (*Block, error) {
+	newBlock, err := b.CreateBlockWithoutAdding(record, key)
+	if err != nil {
+		return nil, err
+	}
+
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+
+	err = b.addBlock(newBlock)
+	if err != nil {
+		return nil, err
+	}
+
+	return newBlock, nil
+}
+
+func (b *BlockChain) CreateBlockWithoutAdding(record *BlockRecord, key crypto.PrivKey) (*Block, error) {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
 
@@ -116,21 +181,21 @@ func (b *BlockChain) AddLocalBlock(record *BlockRecord, key crypto.PrivKey) (*Bl
 	}
 
 	digest := sha256.Sum256(marshal)
-
 	newBlock := Block{
 		Record:    record,
 		Hash:      digest[:],
 		Signature: sig,
 	}
 
-	if err = b.addBlock(&newBlock); err != nil {
-		return nil, err
-	}
-
 	return &newBlock, nil
 }
 
 func (b *BlockChain) AddForeignBlock(record *Block, key *crypto.PubKey) error {
+	if req, is_req := record.Record.InnerRecord.(*BlockRecord_RequestRecord); is_req {
+		if _, is_chain_history := req.RequestRecord.RequestType.(*Request_ChainHistoryRequest); is_chain_history {
+			return nil // no need to add
+		}
+	}
 
 	if err := b.isValidProposedBlock(record, key); err != nil {
 		return fmt.Errorf("invalid block proposal: %s", err.Error())
@@ -192,6 +257,8 @@ func (b *BlockChain) addBlock(record *Block) error {
 	initiator := ledger.PeerIDType(record.Record.InitiatorPeerID)
 
 	// update internal state
+	// Unhandled case: Request record
+	// This is handled by subsequently calling HandlePossibleRequest(...) in `request.go`
 	switch v := record.Record.InnerRecord.(type) {
 	case *BlockRecord_UpdatePeers:
 		log.Printf("Update Peers block added to the chain from peer %s", record.Record.InitiatorPeerID)
@@ -210,12 +277,90 @@ func (b *BlockChain) addBlock(record *Block) error {
 		// update internal state
 		b.innerState.AddRecords(initiator, ledger.ToRecordHashTypeSlice(&v.UpdateRecords.AddedRecordHashes))
 		b.innerState.RemoveRecords(initiator, ledger.ToRecordHashTypeSlice(&v.UpdateRecords.RemovedRecordHashes))
-
-	default:
-		log.Printf("Caught unimplemented record type: %v", v)
 	}
 
 	return nil
+}
+
+// can also use a receiver arg
+// to get the head hash
+func CreateChainHistoryRequest(peerID string) *BlockRecord {
+	return &BlockRecord{
+		Timestamp:       time.Now().Unix(),
+		InitiatorPeerID: peerID,
+		InnerRecord: &BlockRecord_RequestRecord{
+			RequestRecord: &Request{
+				RequestType: &Request_ChainHistoryRequest{
+					ChainHistoryRequest: &ChainHistory{
+						AfterHash: []byte{},
+					},
+				},
+			},
+		},
+	}
+}
+
+func (b *BlockChain) SyncLocalState(new_blocks []*Block) {
+	// we've just received a new list of blocks
+	// step through them, make sure that each one is valid
+	// then add new blocks that come after ours
+	if len(new_blocks) < 1 {
+		fmt.Println("given no blocks!")
+		return
+	}
+
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+
+	fmt.Println("Chain sync response triggered, updating chain...")
+
+	curr := b.root
+	curr_block_iter := 0
+
+	for curr != nil && !slices.Equal(curr.block.Hash, new_blocks[curr_block_iter].Hash) {
+		curr = curr.next
+	}
+	if curr == nil {
+		fmt.Println("invalid sequence.")
+		return // invalid sequence; there must be some overlap
+	}
+
+	// now we've found a part in our chain that matches a part in the proposed chain
+	// curr points to the first matching block in our chain
+	// we want to iterate new_blocks until we find a block that doesn't match our chain
+	var prv *BlockNode
+	for curr != nil && curr_block_iter < len(new_blocks) && slices.Equal(curr.block.Hash, new_blocks[curr_block_iter].Hash) {
+		prv = curr
+		curr = curr.next
+		curr_block_iter += 1
+	}
+	if curr_block_iter >= len(new_blocks) || curr != nil {
+		fmt.Println("overlap doesn't match")
+		return
+	}
+
+	blocks_to_add := new_blocks[curr_block_iter:]
+
+	prv_hash := prv.block.Record.PreviousBlockHash
+
+	for _, proposed_block := range blocks_to_add {
+		if !slices.Equal(proposed_block.Hash, prv_hash) {
+			fmt.Println("presented an inconsistent chain")
+			return
+		}
+		// also want to validate signatures here
+	}
+
+	// at this point, we have new valid blocks
+	// add each one!
+	// we already hold the mutex
+	for _, proposed_block := range blocks_to_add {
+		b.addBlock(proposed_block)
+	}
+
+	// chain sync complete
+	fmt.Println("chain sync complete. chain state:")
+	b.PrintChain()
 }
 
 // for debug purposes
@@ -225,13 +370,25 @@ func (b *BlockChain) PrintChain() {
 		rec := curr.block.Record
 
 		var recType string
-		switch rec.InnerRecord.(type) {
-		case *BlockRecord_UpdatePeers:
-			recType = "Update Authorized Peers"
-		case *BlockRecord_UpdateRecords:
-			recType = "Update Records"
-		default:
-			recType = "unknown record"
+		if curr == b.root {
+			recType = "Genesis Record"
+		} else {
+			switch inner := rec.InnerRecord.(type) {
+			case *BlockRecord_UpdatePeers:
+				recType = "Update Authorized Peers"
+			case *BlockRecord_UpdateRecords:
+				recType = "Update Records"
+			case *BlockRecord_RequestRecord:
+				recType = "Request Record "
+				switch inner.RequestRecord.RequestType.(type) {
+				case *Request_ChainHistoryRequest:
+					recType += "(Chain History Request)"
+				case *Request_OriginRecordRequest:
+					recType += "(Origin Record Request)"
+				case *Request_RecordRequestResponse:
+					recType += "(Record Request Response)"
+				}
+			}
 		}
 
 		fmt.Printf("Block %d:\n\tInitiator: %s\n\tRecord Type: %s\n", i, rec.InitiatorPeerID, recType)

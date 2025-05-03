@@ -26,6 +26,12 @@ type StateHandler interface {
 
 	EntityIsAuthorized(EntityID PeerIDType, QueryEntity PeerIDType) bool
 	EntityHasRecord(EntityID PeerIDType, RecordHash RecordHashType) bool
+
+	GetAuthorizedForPeer(PeerID string) []string
+	GetRecordsForPeer(PeerID string) []string
+
+	GetAllAuthPeers() []string
+	GetAllRecordPeers() []string
 }
 
 // This isn't going to be very optimized.
@@ -127,4 +133,58 @@ func (h *InMemoryStateHandler) EntityHasRecord(EntityID PeerIDType, RecordHash R
 	_, has_record := h.entityRecords[EntityID][RecordHash]
 
 	return has_record
+}
+
+func (h *InMemoryStateHandler) GetAuthorizedForPeer(peerID string) []string {
+	cast := PeerIDType(peerID)
+
+	ret := []string{}
+	if _, exists := h.authorizedEntityMap[cast]; !exists {
+		return ret
+	}
+
+	set := h.authorizedEntityMap[cast]
+
+	for peer, is_auth := range set {
+		if is_auth {
+			ret = append(ret, string(peer))
+		}
+	}
+
+	return ret
+}
+
+func (h *InMemoryStateHandler) GetRecordsForPeer(peerID string) []string {
+	cast := PeerIDType(peerID)
+	ret := []string{}
+	if _, exists := h.entityRecords[cast]; !exists {
+		return ret
+	}
+
+	for rec, exists := range h.entityRecords[cast] {
+		if exists {
+			ret = append(ret, string(rec))
+		}
+	}
+
+	return ret
+}
+
+func (h *InMemoryStateHandler) GetAllAuthPeers() []string {
+	ret := []string{}
+
+	for peer := range h.authorizedEntityMap {
+		ret = append(ret, string(peer))
+	}
+
+	return ret
+}
+func (h *InMemoryStateHandler) GetAllRecordPeers() []string {
+	ret := []string{}
+
+	for peer := range h.entityRecords {
+		ret = append(ret, string(peer))
+	}
+
+	return ret
 }

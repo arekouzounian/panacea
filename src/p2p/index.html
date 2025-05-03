@@ -31,7 +31,7 @@
         </div>
         <input type="submit" value="Submit" />
 
-        <div id="peerIDField">
+        <!-- <div id="peerIDField">
             <p><b>Authorized Peers</b></p>
             {{range .AuthorizedPeers}}
             <p>{{.}}</p>
@@ -42,14 +42,53 @@
             {{range .FileHashes}}
             <p>{{.}}</p>
             {{end}}
+        </div> -->
+    </form>
+
+    <div>
+        <h1>Local Files</h1>
+        {{range .LocalFiles}}
+            <ul>
+                <li>{{.}}</li>
+            </ul>
+        {{end}}
+    </div>
+    
+
+    <h2>Total Ledger State</h2>
+    <h3>Authorized Entities</h3>
+    {{range $peer, $list := .PeerToAuth}}
+        <p><b>{{$peer}}</b></p>
+        {{range $list}}
+        <ul>
+            <li>entity: {{.}}</li>
+        </ul>
+        {{end}}
+    {{end}}
+
+    <h3>Entity Records</h3>
+    {{range $peer, $records := .PeerToRec}}
+        <p><b>{{$peer}}</b></p>
+        {{range $records}}
+        <ul>
+            <li>record: {{.}}</li>
+        </ul>
+        {{end}}
+    {{end}}
+
+    <h3>Query Record</h3>
+    <form id="uploadQueryForm">
+        <div id="queryField">
+            <label for="name">Name:</label><br />
+            <input type="text" id="name" name="name" /><br /><br />
         </div>
+        <input type="submit" value="Submit Query" />
     </form>
 
     <script>
         const choiceSelect = document.getElementById('choice');
         const nameField = document.getElementById('nameField');
         const fileField = document.getElementById('fileField');
-
 
         function updateFields(choice) {
             if (choice === 'name') {
@@ -105,6 +144,52 @@
             }, 1000);
 
         });
+
+        document.getElementById('uploadQueryForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const form = e.target; 
+            const formData = new FormData(form);
+
+            try {
+                const response = await fetch('/sync', {
+                    method: 'POST',
+                    body: formData,
+                });
+
+                if (response.ok) {
+                    alert('query success')
+                    form.reset(); 
+                }
+                else {
+                    alert('query failure.')
+                }
+            } catch(err) {
+                console.error(err)
+                alert('check console for error log')
+            }
+
+            setTimeout(() => {
+                location.reload();
+            }, 1000);
+        });
+
+        // document.getElementById('chainSyncBtn').addEventListener('click', async (e) => {
+        //     e.preventDefault();
+        //     try {
+        //         const resp = await fetch('/sync', {
+        //             method: 'POST'
+        //         });
+
+        //         if (resp.ok) {
+        //             alert('chain sync success.');
+        //         } else {
+        //             alert('chain sync failure!');
+        //         }
+        //     } catch (err) {
+        //         console.error('Error:', err);
+        //         alert('error during post call. see console for details.');
+        //     }
+        // });
     </script>
 </body>
 

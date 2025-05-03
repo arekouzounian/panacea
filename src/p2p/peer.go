@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"text/template"
 	"time"
@@ -40,6 +41,10 @@ type WebInfoHolder struct {
 	Identity        string
 	AuthorizedPeers []string
 	FileHashes      []string
+
+	PeerToAuth map[string][]string
+	PeerToRec  map[string][]string
+	LocalFiles []string
 }
 
 func StartPeer(webServerPort string) {
@@ -132,6 +137,13 @@ func StartPeer(webServerPort string) {
 		panic(err)
 	}
 
+	// set the new chain to be used internally
+	chain.SetLocalChain(bc)
+
+	// set handlers
+	h.SetStreamHandler(chain.PROTOCOL_REQ_CHAIN_EXTENSION, chain.HandleChainHistoryStream)
+	// h.setStreamHandler(chain.PROTOCL_REQ_RECORD_EXTENSION, chain.HandleRecordRequestStream)
+
 	// pubsub; create router and spin up handler threads
 	psOpts := []pubsub.Option{
 		pubsub.WithFloodPublish(true),
@@ -160,12 +172,14 @@ func StartPeer(webServerPort string) {
 	}
 	defer sub.Cancel()
 
-	go read_from_sub(ctx, sub, h, bc)
+	go read_from_sub(req_chan, ctx, sub, &h, bc, &sk)
 
 	info := WebInfoHolder{
 		Identity:        h.ID().String(),
 		FileHashes:      []string{},
 		AuthorizedPeers: []string{},
+		PeerToAuth:      make(map[string][]string),
+		PeerToRec:       make(map[string][]string),
 	}
 
 	// Spin up a webserver
@@ -174,6 +188,29 @@ func StartPeer(webServerPort string) {
 		if err != nil {
 			http.Error(w, err.Error(), 500)
 			return
+		}
+
+		for _, peer := range state.GetAllAuthPeers() {
+			info.PeerToAuth[peer] = state.GetAuthorizedForPeer(peer)
+		}
+		for _, peer := range state.GetAllRecordPeers() {
+			info.PeerToRec[peer] = state.GetRecordsForPeer(peer)
+		}
+
+		// get files
+		store, err := chain.GetOrMakePeerRecordStore(h.ID().String())
+		if err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
+		entries, err := os.ReadDir(store)
+		if err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
+		info.LocalFiles = []string{}
+		for _, entry := range entries {
+			info.LocalFiles = append(info.LocalFiles, entry.Name())
 		}
 
 		t.Execute(w, info)
@@ -223,11 +260,12 @@ func StartPeer(webServerPort string) {
 		// in this case we only use the name value
 		if name == "" && header != nil {
 			// calculate file digest
-			h := sha256.New()
-			if _, err := io.Copy(h, file); err != nil {
+			hasher := sha256.New()
+			if _, err := io.Copy(hasher, file); err != nil {
 				http.Error(w, err.Error(), 500)
+				return
 			}
-			hash := fmt.Sprintf("%x", h.Sum(nil))
+			hash := fmt.Sprintf("%x", hasher.Sum(nil))
 
 			for _, existing_hash := range info.FileHashes {
 				if existing_hash == hash {
@@ -242,6 +280,24 @@ func StartPeer(webServerPort string) {
 					AddedRecordHashes: []string{hash},
 				},
 			}
+
+			store, err := chain.GetOrMakePeerRecordStore(h.ID().String())
+			if err != nil {
+				http.Error(w, err.Error(), 500)
+				return
+			}
+			f, err := os.Create(filepath.Join(store, hash))
+			if err != nil {
+				http.Error(w, err.Error(), 500)
+				return
+			}
+
+			if _, err := io.Copy(f, file); err != nil {
+				http.Error(w, err.Error(), 500)
+				f.Close()
+				return
+			}
+			f.Close()
 		}
 
 		blk, err := bc.AddLocalBlock(&newRecord, sk)
@@ -253,6 +309,24 @@ func StartPeer(webServerPort string) {
 
 		req_chan <- blk
 	}
+	syncHandler := func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != "POST" {
+			http.Error(w, "method not allowed", http.StatusForbidden)
+			return
+		}
+		// send out a chain history request
+		// req := chain.CreateChainHistoryRequest(h.ID().String())
+		// fmt.Println("sending chain history request...")
+		// chain_history_req, err := bc.AddLocalBlock(req, sk)
+
+		// chain_history_req, err := bc.CreateBlockWithoutAdding(req, sk)
+		// if err != nil {
+		// 	fmt.Printf("fatal! unable to send chain history request: %s", err.Error())
+		// 	return
+		// }
+
+		// req_chan <- chain_history_req
+	}
 
 	srv := &http.Server{
 		Addr: ":" + webServerPort,
@@ -260,6 +334,7 @@ func StartPeer(webServerPort string) {
 	// defer srv.Shutdown(ctx)
 	http.HandleFunc("/", mainHandler)
 	http.HandleFunc("/form-submit", formHandler)
+	http.HandleFunc("/sync", syncHandler)
 	go func() {
 		fmt.Printf("now serving on port %s...\n", webServerPort)
 		fmt.Printf("%v", srv.ListenAndServe())
@@ -289,7 +364,7 @@ func write_to_pub(req_chan <-chan *chain.Block, ctx context.Context, pub *pubsub
 	}
 }
 
-func read_from_sub(ctx context.Context, sub *pubsub.Subscription, host host.Host, bc *chain.BlockChain) {
+func read_from_sub(req_chan chan *chain.Block, ctx context.Context, sub *pubsub.Subscription, host *host.Host, bc *chain.BlockChain, sk *crypto.PrivKey) {
 outer_sub_loop:
 	for {
 		select {
@@ -304,7 +379,7 @@ outer_sub_loop:
 				continue
 			}
 
-			if m.ReceivedFrom == host.ID() {
+			if m.ReceivedFrom == (*host).ID() {
 				continue
 			}
 
@@ -323,19 +398,25 @@ outer_sub_loop:
 				continue
 			}
 
-			pk := host.Peerstore().PubKey(peerID)
+			pk := (*host).Peerstore().PubKey(peerID)
 
 			if err = bc.AddForeignBlock(&msg, &pk); err != nil {
 				fmt.Printf("Unable to add foreign block: %s\n", err.Error())
 				continue
 			}
 
-			// switch v := msg.RequestType.(type) {
-			// case *chain.Request_Example_Request:
-			// 	fmt.Printf("Example|%s> %s\n", msg.PeerID[len(msg.PeerID)-16:], v.Example_Request.GetContent())
-			// default:
-			// 	fmt.Printf("Received unimplemented request type: %v", v)
-			// }
+			if block, err := chain.HandlePossibleRequest(ctx, host, &msg); err != nil {
+				fmt.Printf("Error handling inner request: %s\n", err.Error())
+				continue
+			} else if block != nil {
+				new_blk, err := bc.AddLocalBlock(block, *sk)
+				if err != nil {
+					fmt.Printf("unable to create request ack record: %s\n", err.Error())
+					continue
+				}
+
+				req_chan <- new_blk
+			}
 
 			fmt.Println("Block successfully added. Chain state:")
 			bc.PrintChain()
