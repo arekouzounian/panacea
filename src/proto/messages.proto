@@ -47,12 +47,12 @@ message ChainHistory {
 
 message RecordRequestSubmit {
 	string RecipientPeerID = 1;
-	bytes RecordHash = 2; 
+	string RecordHash = 2; 
 }
 
 message RecordRequestAck {
 	string RequesterPeerID = 1; 
-	bytes RecordHash = 2; 
+	string RecordHash = 2; 
 	bool RequestSuccess = 3; 
 }
 

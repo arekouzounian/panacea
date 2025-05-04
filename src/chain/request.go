@@ -128,7 +128,7 @@ func HandlePossibleRequest(ctx context.Context, h *host.Host, record *Block) (*B
 				return nil, err
 			}
 
-			fpath := filepath.Join(store, fmt.Sprintf("%x", req.RecordHash))
+			fpath := filepath.Join(store, req.RecordHash)
 
 			b, err := os.ReadFile(fpath)
 			if err != nil {

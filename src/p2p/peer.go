@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -141,8 +142,8 @@ func StartPeer(webServerPort string) {
 	chain.SetLocalChain(bc)
 
 	// set handlers
-	h.SetStreamHandler(chain.PROTOCOL_REQ_CHAIN_EXTENSION, chain.HandleChainHistoryStream)
-	// h.setStreamHandler(chain.PROTOCL_REQ_RECORD_EXTENSION, chain.HandleRecordRequestStream)
+	// h.SetStreamHandler(chain.PROTOCOL_REQ_CHAIN_EXTENSION, chain.HandleChainHistoryStream)
+	h.SetStreamHandler(chain.PROTOCOL_REQ_RECORD_EXTENSION, chain.HandleRecordRequestStream)
 
 	// pubsub; create router and spin up handler threads
 	psOpts := []pubsub.Option{
@@ -314,18 +315,94 @@ func StartPeer(webServerPort string) {
 			http.Error(w, "method not allowed", http.StatusForbidden)
 			return
 		}
-		// send out a chain history request
-		// req := chain.CreateChainHistoryRequest(h.ID().String())
-		// fmt.Println("sending chain history request...")
-		// chain_history_req, err := bc.AddLocalBlock(req, sk)
 
-		// chain_history_req, err := bc.CreateBlockWithoutAdding(req, sk)
-		// if err != nil {
-		// 	fmt.Printf("fatal! unable to send chain history request: %s", err.Error())
-		// 	return
-		// }
+		err := r.ParseMultipartForm(10 << 20)
+		if err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
 
-		// req_chan <- chain_history_req
+		filename := r.FormValue("name")
+		if filename == "" {
+			return
+		}
+		recipient := r.FormValue("recipient")
+		if recipient == "" {
+			return
+		}
+
+		if recipient == h.ID().String() {
+			return // spurious
+		}
+
+		req := chain.BlockRecord{
+			Timestamp:       time.Now().Unix(),
+			InitiatorPeerID: h.ID().String(),
+			InnerRecord: &chain.BlockRecord_RequestRecord{
+				RequestRecord: &chain.Request{
+					RequestType: &chain.Request_OriginRecordRequest{
+						OriginRecordRequest: &chain.RecordRequestSubmit{
+							RecipientPeerID: recipient,
+							RecordHash:      filename,
+						},
+					},
+				},
+			},
+		}
+
+		fmt.Println("sending new block request...")
+		new_blk, err := bc.AddLocalBlock(&req, sk)
+		if err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
+
+		req_chan <- new_blk
+		bc.PrintChain()
+
+		// do validate
+		store, err := chain.GetOrMakePeerRecordStore(h.ID().String())
+		if err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
+
+		recip_store, err := chain.GetOrMakePeerRecordStore(recipient)
+		if err != nil {
+			http.Error(w, "invalid recipient", 403)
+		}
+
+		if !state.EntityIsAuthorized(ledger.PeerIDType(recipient), ledger.PeerIDType(h.ID().String())) {
+			http.Error(w, "Unauthorized. You may not access this record", 401)
+			return
+		}
+
+		_, err = os.Stat(filepath.Join(recip_store, filename))
+		if errors.Is(err, os.ErrNotExist) {
+			http.Error(w, "invalid record", 401)
+			return
+		} else if err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
+
+		f, err := os.Open(filepath.Join(recip_store, filename))
+		if err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
+
+		mv, err := os.Create(filepath.Join(store, filename))
+		if err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
+
+		_, err = io.Copy(mv, f)
+		if err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
 	}
 
 	srv := &http.Server{

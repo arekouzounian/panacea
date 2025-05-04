@@ -348,7 +348,7 @@ func (x *ChainHistory) GetAfterHash() []byte {
 type RecordRequestSubmit struct {
 	state           protoimpl.MessageState `protogen:"open.v1"`
 	RecipientPeerID string                 `protobuf:"bytes,1,opt,name=RecipientPeerID,proto3" json:"RecipientPeerID,omitempty"`
-	RecordHash      []byte                 `protobuf:"bytes,2,opt,name=RecordHash,proto3" json:"RecordHash,omitempty"`
+	RecordHash      string                 `protobuf:"bytes,2,opt,name=RecordHash,proto3" json:"RecordHash,omitempty"`
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
@@ -390,17 +390,17 @@ func (x *RecordRequestSubmit) GetRecipientPeerID() string {
 	return ""
 }
 
-func (x *RecordRequestSubmit) GetRecordHash() []byte {
+func (x *RecordRequestSubmit) GetRecordHash() string {
 	if x != nil {
 		return x.RecordHash
 	}
-	return nil
+	return ""
 }
 
 type RecordRequestAck struct {
 	state           protoimpl.MessageState `protogen:"open.v1"`
 	RequesterPeerID string                 `protobuf:"bytes,1,opt,name=RequesterPeerID,proto3" json:"RequesterPeerID,omitempty"`
-	RecordHash      []byte                 `protobuf:"bytes,2,opt,name=RecordHash,proto3" json:"RecordHash,omitempty"`
+	RecordHash      string                 `protobuf:"bytes,2,opt,name=RecordHash,proto3" json:"RecordHash,omitempty"`
 	RequestSuccess  bool                   `protobuf:"varint,3,opt,name=RequestSuccess,proto3" json:"RequestSuccess,omitempty"`
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
@@ -443,11 +443,11 @@ func (x *RecordRequestAck) GetRequesterPeerID() string {
 	return ""
 }
 
-func (x *RecordRequestAck) GetRecordHash() []byte {
+func (x *RecordRequestAck) GetRecordHash() string {
 	if x != nil {
 		return x.RecordHash
 	}
-	return nil
+	return ""
 }
 
 func (x *RecordRequestAck) GetRequestSuccess() bool {
@@ -588,12 +588,12 @@ const file_messages_proto_rawDesc = "" +
 	"\x13RecordRequestSubmit\x12(\n" +
 	"\x0fRecipientPeerID\x18\x01 \x01(\tR\x0fRecipientPeerID\x12\x1e\n" +
 	"\n" +
-	"RecordHash\x18\x02 \x01(\fR\n" +
+	"RecordHash\x18\x02 \x01(\tR\n" +
 	"RecordHash\"\x84\x01\n" +
 	"\x10RecordRequestAck\x12(\n" +
 	"\x0fRequesterPeerID\x18\x01 \x01(\tR\x0fRequesterPeerID\x12\x1e\n" +
 	"\n" +
-	"RecordHash\x18\x02 \x01(\fR\n" +
+	"RecordHash\x18\x02 \x01(\tR\n" +
 	"RecordHash\x12&\n" +
 	"\x0eRequestSuccess\x18\x03 \x01(\bR\x0eRequestSuccess\"r\n" +
 	"\x10PeerRecordUpdate\x12,\n" +

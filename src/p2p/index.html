@@ -79,8 +79,10 @@
     <h3>Query Record</h3>
     <form id="uploadQueryForm">
         <div id="queryField">
-            <label for="name">Name:</label><br />
-            <input type="text" id="name" name="name" /><br /><br />
+            <label for="name">Name of Record:</label><br />
+            <input type="text" id="recName" name="name" /><br /><br />
+            <label for="Recipient">Peer:</label><br />
+            <input type="text" id="peerName" name="recipient" /><br /><br />
         </div>
         <input type="submit" value="Submit Query" />
     </form>
@@ -157,20 +159,20 @@
                 });
 
                 if (response.ok) {
-                    alert('query success')
+                    alert('query success!')
                     form.reset(); 
+                    setTimeout(() => {
+                        location.reload();
+                    }, 1000);
                 }
                 else {
-                    alert('query failure.')
+                    alert('query failure:', response.body);
                 }
             } catch(err) {
                 console.error(err)
                 alert('check console for error log')
             }
 
-            setTimeout(() => {
-                location.reload();
-            }, 1000);
         });
 
         // document.getElementById('chainSyncBtn').addEventListener('click', async (e) => {
