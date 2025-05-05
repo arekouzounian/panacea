@@ -53,7 +53,7 @@ func StartPeer(webServerPort string) {
 	defer cancel()
 
 	// hardcoded bootstrap node
-	bootstrapPeer, err := multiaddr.NewMultiaddr("/ip4/127.0.0.1/tcp/9001/p2p/QmQaUXRLTMDfNm29wTdrvYZ5q1HGHF6LAQrsZ153PJpDE6")
+	bootstrapPeer, err := multiaddr.NewMultiaddr("/ip4/127.0.0.1/tcp/9001/p2p/12D3KooWRbVMva4sB51whN4JvBgKnSLL9jBZHniDnanM8aa1ED1x")
 	if err != nil {
 		panic(err)
 	}
@@ -260,6 +260,7 @@ func StartPeer(webServerPort string) {
 		// edge case: both form fields maliciously submitted
 		// in this case we only use the name value
 		if name == "" && header != nil {
+			defer file.Close()
 			// calculate file digest
 			hasher := sha256.New()
 			if _, err := io.Copy(hasher, file); err != nil {
@@ -292,13 +293,15 @@ func StartPeer(webServerPort string) {
 				http.Error(w, err.Error(), 500)
 				return
 			}
+			defer f.Close()
+
+			// go back to the start of the file
+			file.Seek(0, io.SeekStart)
 
 			if _, err := io.Copy(f, file); err != nil {
 				http.Error(w, err.Error(), 500)
-				f.Close()
 				return
 			}
-			f.Close()
 		}
 
 		blk, err := bc.AddLocalBlock(&newRecord, sk)

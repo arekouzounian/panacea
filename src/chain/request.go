@@ -1,7 +1,6 @@
 package chain
 
 import (
-	"bufio"
 	"context"
 	"encoding/binary"
 	"fmt"
@@ -98,9 +97,6 @@ func HandlePossibleRequest(ctx context.Context, h *host.Host, record *Block) (*B
 			}
 		}
 
-		time.Sleep(1 * time.Second)
-		stream.Close()
-
 	case *Request_OriginRecordRequest:
 		// if we match the request, validate them and send them the record
 
@@ -123,6 +119,9 @@ func HandlePossibleRequest(ctx context.Context, h *host.Host, record *Block) (*B
 		if bc.IsAuthorizedEntity((*h).ID().String(), record.Record.InitiatorPeerID) {
 			ack = true
 
+			fmt.Println("authorized entity making request for record, attempting to send")
+			fmt.Printf("Sending record %s to entity %s\n", req.RecordHash, record.Record.InitiatorPeerID)
+
 			store, err := GetOrMakePeerRecordStore((*h).ID().String())
 			if err != nil {
 				return nil, err
@@ -135,11 +134,13 @@ func HandlePossibleRequest(ctx context.Context, h *host.Host, record *Block) (*B
 				return nil, fmt.Errorf("unable to read file %s to service request: %s", fpath, err.Error())
 			}
 
+			err = binary.Write(stream, binary.BigEndian, uint32(len(b)))
+			if err != nil {
+				return nil, fmt.Errorf("unable to send length encoding over the wire: %s", err.Error())
+			}
+
 			// In the future might want to buffer these writes
 			stream.Write(b)
-
-			time.Sleep(1 * time.Second) // horrible
-			stream.Close()
 		}
 
 		new_record := BlockRecord{
@@ -167,23 +168,28 @@ func HandlePossibleRequest(ctx context.Context, h *host.Host, record *Block) (*B
 
 func HandleRecordRequestStream(s network.Stream) {
 	fmt.Println("received new record request stream")
-	reader := bufio.NewReader(s)
+	defer s.Close()
 
-	buf := []byte{}
-	for !s.Conn().IsClosed() {
-		b, err := reader.ReadByte()
-		if err != nil {
-			break
-		}
-
-		buf = append(buf, b)
+	var msg_len uint32
+	err := binary.Read(s, binary.BigEndian, &msg_len)
+	if err != nil {
+		fmt.Printf("error receiving length encoding from stream: %s\n", err.Error())
+		return
 	}
 
-	fmt.Printf("received data from stream: %x", buf)
+	buf := make([]byte, msg_len)
+	_, err = s.Read(buf)
+	if err != nil {
+		fmt.Printf("error receiving record from stream: %s\n", err.Error())
+		return
+	}
+
+	fmt.Printf("received data from stream: %v", buf)
 }
 
 func HandleChainHistoryStream(s network.Stream) {
 	fmt.Println("received new chain sync stream")
+	defer s.Close()
 
 	// read all the blocks in sequence
 
@@ -194,7 +200,7 @@ func HandleChainHistoryStream(s network.Stream) {
 		return // block chain not initialized yet
 	}
 
-	for !s.Conn().IsClosed() {
+	for {
 		var lenBuf [4]byte
 		_, err := io.ReadFull(s, lenBuf[:])
 		if err != nil {
@@ -203,6 +209,10 @@ func HandleChainHistoryStream(s network.Stream) {
 			return
 		}
 		msg_len := binary.BigEndian.Uint32(lenBuf[:])
+
+		if msg_len == 0 {
+			break
+		}
 
 		buf := make([]byte, msg_len)
 		var new_block Block
