@@ -7,7 +7,7 @@ A **secure**, **decentralized** record sharing system inspired by blockchain con
 ## Overview
 Panacea began as a semester-long project for one of my graduate courses at USC. The goal was to create a secure audit log. 
 
-Panacea can be thought of as a very simple overlay network with distributed filesharing capabilities. Each 'node' is tied to a cryptographic identity, and uses *libp2p* for its underlying communication/authentication with peers. 
+Panacea can be thought of as a very simple overlay network with decentralized filesharing capabilities. Each 'node' is tied to a cryptographic identity, and uses *libp2p* for its underlying communication/authentication with peers. 
 
 ## Architecture
 There are four main components in a panacea node:
