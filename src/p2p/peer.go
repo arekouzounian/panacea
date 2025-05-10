@@ -4,10 +4,8 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
-	"errors"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"os"
 	"os/signal"
@@ -16,6 +14,7 @@ import (
 	"text/template"
 	"time"
 
+	logging "github.com/ipfs/go-log/v2"
 	"github.com/libp2p/go-libp2p"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
@@ -25,7 +24,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/libp2p/go-libp2p/core/routing"
 	drouting "github.com/libp2p/go-libp2p/p2p/discovery/routing"
-	dutil "github.com/libp2p/go-libp2p/p2p/discovery/util"
+
 	"github.com/multiformats/go-multiaddr"
 	"google.golang.org/protobuf/proto"
 
@@ -36,6 +35,10 @@ import (
 const (
 	TopicName               = "panacea-test"
 	ProtoPrefix protocol.ID = "panacea"
+)
+
+var (
+	log = logging.Logger("panacea")
 )
 
 type WebInfoHolder struct {
@@ -49,6 +52,11 @@ type WebInfoHolder struct {
 }
 
 func StartPeer(webServerPort string) {
+	// err := logging.SetLogLevel("discovery-util", "debug")
+	// if err != nil {
+	// 	panic(err)
+	// }
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -105,9 +113,10 @@ func StartPeer(webServerPort string) {
 
 	anyConnected := false
 	for !anyConnected {
-		dutil.Advertise(ctx, disc, TopicName)
-		fmt.Println("Advertised ourselves to", TopicName)
 		fmt.Println("Searching for peers...")
+
+		disc.Advertise(ctx, TopicName)
+		fmt.Println("Advertised ourselves to", TopicName)
 		peerChan, err := disc.FindPeers(ctx, TopicName)
 
 		if err != nil {
@@ -362,50 +371,6 @@ func StartPeer(webServerPort string) {
 
 		req_chan <- new_blk
 		bc.PrintChain()
-
-		// do validate
-		store, err := chain.GetOrMakePeerRecordStore(h.ID().String())
-		if err != nil {
-			http.Error(w, err.Error(), 500)
-			return
-		}
-
-		recip_store, err := chain.GetOrMakePeerRecordStore(recipient)
-		if err != nil {
-			http.Error(w, "invalid recipient", 403)
-		}
-
-		if !state.EntityIsAuthorized(ledger.PeerIDType(recipient), ledger.PeerIDType(h.ID().String())) {
-			http.Error(w, "Unauthorized. You may not access this record", 401)
-			return
-		}
-
-		_, err = os.Stat(filepath.Join(recip_store, filename))
-		if errors.Is(err, os.ErrNotExist) {
-			http.Error(w, "invalid record", 401)
-			return
-		} else if err != nil {
-			http.Error(w, err.Error(), 500)
-			return
-		}
-
-		f, err := os.Open(filepath.Join(recip_store, filename))
-		if err != nil {
-			http.Error(w, err.Error(), 500)
-			return
-		}
-
-		mv, err := os.Create(filepath.Join(store, filename))
-		if err != nil {
-			http.Error(w, err.Error(), 500)
-			return
-		}
-
-		_, err = io.Copy(mv, f)
-		if err != nil {
-			http.Error(w, err.Error(), 500)
-			return
-		}
 	}
 
 	srv := &http.Server{
@@ -427,8 +392,8 @@ func StartPeer(webServerPort string) {
 
 	// reached on exit condition
 	<-ch
-	log.Println("Received shutdown signal, attempting graceful shutdown...")
-
+	// log.Println("Received shutdown signal, attempting graceful shutdown...")
+	fmt.Println("Received shutdown signal, attempting graceful shutdown...")
 }
 
 func write_to_pub(req_chan <-chan *chain.Block, ctx context.Context, pub *pubsub.Topic) {

@@ -2,9 +2,9 @@ package chain
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/binary"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"time"
@@ -184,7 +184,23 @@ func HandleRecordRequestStream(s network.Stream) {
 		return
 	}
 
-	fmt.Printf("received data from stream: %v", buf)
+	store, err := GetOrMakePeerRecordStore(s.Conn().LocalPeer().String())
+
+	if err != nil {
+		fmt.Printf("error trying to get local record store: %s\n", err.Error())
+		return
+	}
+
+	digest := sha256.Sum256(buf)
+	new_path := filepath.Join(store, fmt.Sprintf("%x", digest))
+
+	err = os.WriteFile(new_path, buf, 0660)
+	if err != nil {
+		fmt.Printf("error writing file to local store: %s\n", err.Error())
+		return
+	}
+
+	fmt.Printf("successfully stored queried record at %s.\n", new_path)
 }
 
 func HandleChainHistoryStream(s network.Stream) {
@@ -197,18 +213,12 @@ func HandleChainHistoryStream(s network.Stream) {
 
 	bc := GetLocalChain()
 	if bc == nil {
-		return // block chain not initialized yet
+		return
 	}
 
 	for {
-		var lenBuf [4]byte
-		_, err := io.ReadFull(s, lenBuf[:])
-		if err != nil {
-			// Could be EOF if 0–3 bytes were read
-			fmt.Printf("error reading into buffer: %s\n", err)
-			return
-		}
-		msg_len := binary.BigEndian.Uint32(lenBuf[:])
+		var msg_len uint32
+		binary.Read(s, binary.BigEndian, &msg_len)
 
 		if msg_len == 0 {
 			break
@@ -216,7 +226,7 @@ func HandleChainHistoryStream(s network.Stream) {
 
 		buf := make([]byte, msg_len)
 		var new_block Block
-		_, err = s.Read(buf)
+		_, err := s.Read(buf)
 		if err != nil {
 			fmt.Printf("error reading block encoding from stream: %s\n", err.Error())
 
